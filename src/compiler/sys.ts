@@ -832,6 +832,40 @@ namespace ts {
     }
 
     /*@internal*/
+    export function resolveModule(moduleName: string, initialDir: string, host: Pick<System, "require" | "resolvePath">, log: (message: string) => void, logErrors?: (message: string) => void): {} | undefined {
+        const resolvedPath = normalizeSlashes(host.resolvePath(combinePaths(initialDir, "node_modules")));
+        log(`Loading ${moduleName} from ${initialDir} (resolved to ${resolvedPath})`);
+        const result = host.require!(resolvedPath, moduleName); // TODO: GH#18217
+        if (result.error) {
+            const err = result.error.stack || result.error.message || JSON.stringify(result.error);
+            (logErrors || log)(`Failed to load module '${moduleName}' from ${resolvedPath}: ${err}`);
+            return undefined;
+        }
+        return result.module;
+    }
+
+    /*@internal*/
+    export async function importPlugin(moduleName: string, initialDir: string, host: Pick<System, "importPlugin">, log: (message: string) => void, logErrors?: (message: string) => void): Promise<{} | undefined> {
+        Debug.assertIsDefined(host.importPlugin);
+        const resolvedPath = combinePaths(initialDir, "node_modules");
+        log(`Dynamically importing ${moduleName} from ${initialDir} (resolved to ${resolvedPath})`);
+        let result: ModuleImportResult;
+        try {
+            result = await host.importPlugin(resolvedPath, moduleName);
+        }
+        catch (e) {
+            result = { module: undefined, error: e };
+        }
+        if (result.error) {
+            const err = result.error.stack || result.error.message || JSON.stringify(result.error);
+            (logErrors || log)(`Failed to dynamically import module '${moduleName}' from ${resolvedPath}: ${err}`);
+            return undefined;
+        }
+        return result.module;
+    }
+
+
+    /*@internal*/
     export type FileSystemEntryExists = (fileorDirectrory: string, entryKind: FileSystemEntryKind) => boolean;
 
     /*@internal*/
@@ -1377,7 +1411,8 @@ namespace ts {
         base64decode?(input: string): string;
         base64encode?(input: string): string;
         /*@internal*/ bufferFrom?(input: string, encoding?: string): Buffer;
-        /*@internal*/ require?(baseDir: string, moduleName: string): RequireResult;
+        /*@internal*/ require?(baseDir: string, moduleName: string): ModuleImportResult;
+        /*@internal*/ importPlugin?(root: string, moduleName: string): Promise<ModuleImportResult>;
 
         // For testing
         /*@internal*/ now?(): Date;

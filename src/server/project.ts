@@ -243,35 +243,7 @@ namespace ts.server {
         }
 
         public static resolveModule(moduleName: string, initialDir: string, host: ServerHost, log: (message: string) => void, logErrors?: (message: string) => void): {} | undefined {
-            const resolvedPath = normalizeSlashes(host.resolvePath(combinePaths(initialDir, "node_modules")));
-            log(`Loading ${moduleName} from ${initialDir} (resolved to ${resolvedPath})`);
-            const result = host.require!(resolvedPath, moduleName); // TODO: GH#18217
-            if (result.error) {
-                const err = result.error.stack || result.error.message || JSON.stringify(result.error);
-                (logErrors || log)(`Failed to load module '${moduleName}' from ${resolvedPath}: ${err}`);
-                return undefined;
-            }
-            return result.module;
-        }
-
-        /*@internal*/
-        public static async importServicePluginAsync(moduleName: string, initialDir: string, host: ServerHost, log: (message: string) => void, logErrors?: (message: string) => void): Promise<{} | undefined> {
-            Debug.assertIsDefined(host.importPlugin);
-            const resolvedPath = combinePaths(initialDir, "node_modules");
-            log(`Dynamically importing ${moduleName} from ${initialDir} (resolved to ${resolvedPath})`);
-            let result: ModuleImportResult;
-            try {
-                result = await host.importPlugin(resolvedPath, moduleName);
-            }
-            catch (e) {
-                result = { module: undefined, error: e };
-            }
-            if (result.error) {
-                const err = result.error.stack || result.error.message || JSON.stringify(result.error);
-                (logErrors || log)(`Failed to dynamically import module '${moduleName}' from ${resolvedPath}: ${err}`);
-                return undefined;
-            }
-            return result.module;
+            return resolveModule(moduleName, initialDir, host, log, logErrors);
         }
 
         /*@internal*/
@@ -1648,7 +1620,7 @@ namespace ts.server {
                 (errorLogs ??= []).push(message);
             };
             const resolvedModule = firstDefined(searchPaths, searchPath =>
-                Project.resolveModule(pluginConfigEntry.name, searchPath, this.projectService.host, log, logError) as PluginModuleFactory | undefined);
+                resolveModule(pluginConfigEntry.name, searchPath, this.projectService.host, log, logError) as PluginModuleFactory | undefined);
             return { pluginConfigEntry, pluginConfigOverrides, resolvedModule, errorLogs };
         }
 
@@ -1667,7 +1639,7 @@ namespace ts.server {
 
             let resolvedModule: PluginModuleFactory | undefined;
             for (const searchPath of searchPaths) {
-                resolvedModule = await Project.importServicePluginAsync(pluginConfigEntry.name, searchPath, this.projectService.host, log, logError) as PluginModuleFactory | undefined;
+                resolvedModule = await importPlugin(pluginConfigEntry.name, searchPath, this.projectService.host, log, logError) as PluginModuleFactory | undefined;
                 if (resolvedModule !== undefined) {
                     break;
                 }

@@ -349,7 +349,7 @@ interface Array<T> { length: number; [n: number]: T; }`
         private readonly environmentVariables?: ESMap<string, string>;
         private readonly executingFilePath: string;
         private readonly currentDirectory: string;
-        public require: ((initialPath: string, moduleName: string) => RequireResult) | undefined;
+        public require: ((initialPath: string, moduleName: string) => ModuleImportResult) | undefined;
         public storeFilesChangingSignatureDuringEmit = true;
         watchFile: HostWatchFile;
         private inodeWatching: boolean | undefined;
