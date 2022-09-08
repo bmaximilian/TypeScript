@@ -105,7 +105,6 @@ namespace ts.server {
     /* @internal */
     export interface BeginEnablePluginResult {
         pluginConfigEntry: PluginImport;
-        pluginConfigOverrides: Map<any> | undefined;
         resolvedModule: PluginModuleFactory | undefined;
         errorLogs: string[] | undefined;
     }
@@ -1576,7 +1575,7 @@ namespace ts.server {
             return !!this.program && this.program.isSourceOfProjectReferenceRedirect(fileName);
         }
 
-        protected enableGlobalPlugins(options: CompilerOptions, pluginConfigOverrides: Map<any> | undefined): void {
+        protected enableGlobalPlugins(options: CompilerOptions): void {
             if (!this.projectService.globalPlugins.length) return;
             const host = this.projectService.host;
 
@@ -1603,7 +1602,7 @@ namespace ts.server {
                 // Provide global: true so plugins can detect why they can't find their config
                 this.projectService.logger.info(`Loading global plugin ${globalPluginName}`);
 
-                this.enablePlugin({ name: globalPluginName, global: true } as PluginImport, searchPaths, pluginConfigOverrides);
+                this.enablePlugin({ name: globalPluginName, global: true } as PluginImport, searchPaths);
             }
         }
 
@@ -1611,7 +1610,7 @@ namespace ts.server {
          * Performs the initial steps of enabling a plugin by finding and instantiating the module for a plugin synchronously using 'require'.
          */
         /*@internal*/
-        beginEnablePluginSync(pluginConfigEntry: PluginImport, searchPaths: string[], pluginConfigOverrides: Map<any> | undefined): BeginEnablePluginResult {
+        beginEnablePluginSync(pluginConfigEntry: PluginImport, searchPaths: string[]): BeginEnablePluginResult {
             Debug.assertIsDefined(this.projectService.host.require);
 
             let errorLogs: string[] | undefined;
@@ -1621,14 +1620,14 @@ namespace ts.server {
             };
             const resolvedModule = firstDefined(searchPaths, searchPath =>
                 resolveModule(pluginConfigEntry.name, searchPath, this.projectService.host, log, logError) as PluginModuleFactory | undefined);
-            return { pluginConfigEntry, pluginConfigOverrides, resolvedModule, errorLogs };
+            return { pluginConfigEntry, resolvedModule, errorLogs };
         }
 
         /**
          * Performs the initial steps of enabling a plugin by finding and instantiating the module for a plugin asynchronously using dynamic `import`.
          */
         /*@internal*/
-        async beginEnablePluginAsync(pluginConfigEntry: PluginImport, searchPaths: string[], pluginConfigOverrides: Map<any> | undefined): Promise<BeginEnablePluginResult> {
+        async beginEnablePluginAsync(pluginConfigEntry: PluginImport, searchPaths: string[]): Promise<BeginEnablePluginResult> {
             Debug.assertIsDefined(this.projectService.host.importPlugin);
 
             let errorLogs: string[] | undefined;
@@ -1644,16 +1643,16 @@ namespace ts.server {
                     break;
                 }
             }
-            return { pluginConfigEntry, pluginConfigOverrides, resolvedModule, errorLogs };
+            return { pluginConfigEntry, resolvedModule, errorLogs };
         }
 
         /**
          * Performs the remaining steps of enabling a plugin after its module has been instantiated.
          */
         /*@internal*/
-        endEnablePlugin({ pluginConfigEntry, pluginConfigOverrides, resolvedModule, errorLogs }: BeginEnablePluginResult) {
+        endEnablePlugin({ pluginConfigEntry, resolvedModule, errorLogs }: BeginEnablePluginResult) {
             if (resolvedModule) {
-                const configurationOverride = pluginConfigOverrides && pluginConfigOverrides.get(pluginConfigEntry.name);
+                const configurationOverride = this.projectService.currentPluginConfigOverrides?.get(pluginConfigEntry.name);
                 if (configurationOverride) {
                     // Preserve the name property since it's immutable
                     const pluginName = pluginConfigEntry.name;
@@ -1669,8 +1668,8 @@ namespace ts.server {
             }
         }
 
-        protected enablePlugin(pluginConfigEntry: PluginImport, searchPaths: string[], pluginConfigOverrides: Map<any> | undefined): void {
-            this.projectService.requestEnablePlugin(this, pluginConfigEntry, searchPaths, pluginConfigOverrides);
+        protected enablePlugin(pluginConfigEntry: PluginImport, searchPaths: string[]): void {
+            this.projectService.requestEnablePlugin(this, pluginConfigEntry, searchPaths);
         }
 
         private enableProxy(pluginModuleFactory: PluginModuleFactory, configEntry: PluginImport) {
@@ -1957,7 +1956,6 @@ namespace ts.server {
             watchOptions: WatchOptions | undefined,
             projectRootPath: NormalizedPath | undefined,
             currentDirectory: string | undefined,
-            pluginConfigOverrides: ESMap<string, any> | undefined,
             typeAcquisition: TypeAcquisition | undefined) {
             super(projectService.newInferredProjectName(),
                 ProjectKind.Inferred,
@@ -1976,7 +1974,7 @@ namespace ts.server {
             if (!projectRootPath && !projectService.useSingleInferredProject) {
                 this.canonicalCurrentDirectory = projectService.toCanonicalFileName(this.currentDirectory);
             }
-            this.enableGlobalPlugins(this.getCompilerOptions(), pluginConfigOverrides);
+            this.enableGlobalPlugins(this.getCompilerOptions());
         }
 
         addRoot(info: ScriptInfo) {
@@ -2491,7 +2489,7 @@ namespace ts.server {
         }
 
         /*@internal*/
-        enablePluginsWithOptions(options: CompilerOptions, pluginConfigOverrides: ESMap<string, any> | undefined): void {
+        enablePluginsWithOptions(options: CompilerOptions): void {
             if (!options.plugins?.length && !this.projectService.globalPlugins.length) return;
             const host = this.projectService.host;
             if (!host.require && !host.importPlugin) {
@@ -2512,11 +2510,11 @@ namespace ts.server {
             // Enable tsconfig-specified plugins
             if (options.plugins) {
                 for (const pluginConfigEntry of options.plugins) {
-                    this.enablePlugin(pluginConfigEntry, searchPaths, pluginConfigOverrides);
+                    this.enablePlugin(pluginConfigEntry, searchPaths);
                 }
             }
 
-            return this.enableGlobalPlugins(options, pluginConfigOverrides);
+            return this.enableGlobalPlugins(options);
         }
 
         /**
@@ -2642,7 +2640,6 @@ namespace ts.server {
             lastFileExceededProgramSize: string | undefined,
             public compileOnSaveEnabled: boolean,
             projectFilePath?: string,
-            pluginConfigOverrides?: ESMap<string, any>,
             watchOptions?: WatchOptions) {
             super(externalProjectName,
                 ProjectKind.External,
@@ -2655,7 +2652,7 @@ namespace ts.server {
                 watchOptions,
                 projectService.host,
                 getDirectoryPath(projectFilePath || normalizeSlashes(externalProjectName)));
-            this.enableGlobalPlugins(this.getCompilerOptions(), pluginConfigOverrides);
+            this.enableGlobalPlugins(this.getCompilerOptions());
         }
 
         updateGraph() {

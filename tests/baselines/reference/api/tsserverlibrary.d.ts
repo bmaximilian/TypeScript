@@ -10211,8 +10211,8 @@ declare namespace ts.server {
         setTypeAcquisition(newTypeAcquisition: TypeAcquisition | undefined): void;
         getTypeAcquisition(): TypeAcquisition;
         protected removeRoot(info: ScriptInfo): void;
-        protected enableGlobalPlugins(options: CompilerOptions, pluginConfigOverrides: Map<any> | undefined): void;
-        protected enablePlugin(pluginConfigEntry: PluginImport, searchPaths: string[], pluginConfigOverrides: Map<any> | undefined): void;
+        protected enableGlobalPlugins(options: CompilerOptions): void;
+        protected enablePlugin(pluginConfigEntry: PluginImport, searchPaths: string[]): void;
         private enableProxy;
         /** Starts a new check for diagnostics. Call this if some file has updated that would cause diagnostics to be changed. */
         refreshDiagnostics(): void;
@@ -10518,7 +10518,6 @@ declare namespace ts.server {
         readonly globalPlugins: readonly string[];
         readonly pluginProbeLocations: readonly string[];
         readonly allowLocalPluginLoads: boolean;
-        private currentPluginConfigOverrides;
         readonly typesMapLocation: string | undefined;
         /** @deprecated use serverMode instead */
         readonly syntaxOnly: boolean;
