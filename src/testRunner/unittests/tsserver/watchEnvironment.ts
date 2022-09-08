@@ -478,7 +478,7 @@ namespace ts.projectSystem {
         });
     });
 
-    describe("unittests:: tsserver:: watchEnvironment:: plugin overriding watch", () => {
+    describe("unittests:: tsserver:: watchEnvironment:: watchFactory", () => {
         it("plugin overriding watch", () => {
             const { host, session, watchFile, watchDirectory, watchedFiles, aTs, bTs, } = createHostForPlugins({ globalPlugins: ["myplugin"] });
             const existingWatchFile = host.watchFile;
@@ -515,10 +515,120 @@ namespace ts.projectSystem {
             baselineTsserverLogs("watchEnvironment", "plugin overriding watch", session);
         });
 
-        function createHostForPlugins(opts: Partial<TestSessionOptions>) {
+        it("watchFactory in config file", () => {
+            const { host, session, aTs, bTs, } = createHostForPlugins(/*opts*/ undefined, { watchFactory: "myplugin" });
+            // host.require = (_initialPath, moduleName) => {
+            //     assert.equal(moduleName, "myplugin");
+            //     return {
+            //         // TODO:
+            //         module: () => ({
+            //             create(info: server.PluginCreateInfo) {
+            //                 info.serverHost.watchFile = watchFile;
+            //                 info.serverHost.watchDirectory = watchDirectory;
+            //                 return info.languageService;
+            //             }
+            //         }),
+            //         error: undefined
+            //     };
+            // };
+            openFilesForSession([aTs], session);
+
+            // Change b.ts
+            session.logger.info("Change file");
+            host.writeFile(bTs.path, aTs.content);
+            // // Since we have overriden watch, this shouldnt do anything
+            // host.checkTimeoutQueueLength(0);
+
+            // // Actually invoke watches
+            // session.logger.info("Invoke plugin watches");
+            // watchedFiles.get(bTs.path)!.forEach(({ callback }) => callback(bTs.path, FileWatcherEventKind.Changed));
+            // Host should have updates queued
+            host.runQueuedTimeoutCallbacks();
+
+            baselineTsserverLogs("watchEnvironment", "watchFactory in config file", session);
+        });
+
+        it("watchFactory as configuration of host", () => {
+            const { host, session, aTs, bTs, } = createHostForPlugins();
+            // host.require = (_initialPath, moduleName) => {
+            //     assert.equal(moduleName, "myplugin");
+            //     return {
+            //         // TODO:
+            //         module: () => ({
+            //             create(info: server.PluginCreateInfo) {
+            //                 info.serverHost.watchFile = watchFile;
+            //                 info.serverHost.watchDirectory = watchDirectory;
+            //                 return info.languageService;
+            //             }
+            //         }),
+            //         error: undefined
+            //     };
+            // };
+            session.executeCommandSeq<protocol.ConfigureRequest>({
+                command: protocol.CommandTypes.Configure,
+                arguments: { watchOptions: { watchFactory: "myplugin" } }
+            });
+
+            openFilesForSession([aTs], session);
+
+            // Change b.ts
+            session.logger.info("Change file");
+            host.writeFile(bTs.path, aTs.content);
+            // // Since we have overriden watch, this shouldnt do anything
+            // host.checkTimeoutQueueLength(0);
+
+            // // Actually invoke watches
+            // session.logger.info("Invoke plugin watches");
+            // watchedFiles.get(bTs.path)!.forEach(({ callback }) => callback(bTs.path, FileWatcherEventKind.Changed));
+            // Host should have updates queued
+            host.runQueuedTimeoutCallbacks();
+
+            baselineTsserverLogs("watchEnvironment", "watchFactory as configuration of host", session);
+        });
+
+        it("watchFactory as configuration of host with errors", () => {
+            const { host, session, aTs, bTs, } = createHostForPlugins();
+            // host.require = (_initialPath, moduleName) => {
+            //     assert.equal(moduleName, "myplugin");
+            //     return {
+            //         // TODO:
+            //         module: () => ({
+            //             create(info: server.PluginCreateInfo) {
+            //                 info.serverHost.watchFile = watchFile;
+            //                 info.serverHost.watchDirectory = watchDirectory;
+            //                 return info.languageService;
+            //             }
+            //         }),
+            //         error: undefined
+            //     };
+            // };
+
+            session.executeCommandSeq<protocol.ConfigureRequest>({
+                command: protocol.CommandTypes.Configure,
+                arguments: { watchOptions: { watchFactory: "myplugin/../malicious" } }
+            });
+
+            openFilesForSession([aTs], session);
+
+            // Change b.ts
+            session.logger.info("Change file");
+            host.writeFile(bTs.path, aTs.content);
+            // // Since we have overriden watch, this shouldnt do anything
+            // host.checkTimeoutQueueLength(0);
+
+            // // Actually invoke watches
+            // session.logger.info("Invoke plugin watches");
+            // watchedFiles.get(bTs.path)!.forEach(({ callback }) => callback(bTs.path, FileWatcherEventKind.Changed));
+            // Host should have updates queued
+            host.runQueuedTimeoutCallbacks();
+
+            baselineTsserverLogs("watchEnvironment", "watchFactory as configuration of host with errors", session);
+        });
+
+        function createHostForPlugins(opts?: Partial<TestSessionOptions>, watchOptions?: WatchOptions) {
             const configFile: File = {
                 path: `${tscWatch.projectRoot}/tsconfig.json`,
-                content: `{}`
+                content: JSON.stringify({ watchOptions })
             };
             const aTs: File = {
                 path: `${tscWatch.projectRoot}/a.ts`,

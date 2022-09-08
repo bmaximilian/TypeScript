@@ -4225,6 +4225,10 @@
         "category": "Error",
         "code": 5095
     },
+    "'watchFactory' cannot specify anything but package name.": {
+        "category": "Error",
+        "code": 5096
+    },
 
     "Generates a sourcemap for each corresponding '.d.ts' file.": {
         "category": "Message",
@@ -5898,6 +5902,10 @@
     "Specify emit/checking behavior for imports that are only used for types.": {
         "category": "Message",
         "code": 6718
+    },
+    "Specify which factory to invoke 'watchFile' and 'watchDirectory' on.": {
+        "category": "Message",
+        "code": 6719
     },
     "Default catch clause variables as 'unknown' instead of 'any'.": {
         "category": "Message",

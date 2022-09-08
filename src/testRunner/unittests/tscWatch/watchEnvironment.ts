@@ -520,7 +520,8 @@ namespace ts.tscWatch {
                             {
                                 caption: "delete fooBar",
                                 change: sys => sys.deleteFile(`${projectRoot}/node_modules/bar/fooBar.d.ts`),
-                                timeouts: sys => sys.checkTimeoutQueueLength(0),                            }
+                                timeouts: sys => sys.checkTimeoutQueueLength(0),
+                            }
                         ]
                     });
 
@@ -686,6 +687,94 @@ namespace ts.tscWatch {
                     },
                 ]
             });
+        });
+
+        describe("watchFactory", () => {
+            verifyTscWatch({
+                scenario,
+                subScenario: `watchFactory/in config file`,
+                commandLineArgs: ["-w", "--extendedDiagnostics"],
+                sys: () => createSystem({ watchFactory: "myplugin" }),
+                changes: [
+                    {
+                        caption: "Change file",
+                        change: sys => sys.appendFile(`${projectRoot}/b.ts`, "export function foo() { }"),
+                        timeouts: sys => sys.runQueuedTimeoutCallbacks(),
+                    },
+                ]
+            });
+
+            verifyTscWatch({
+                scenario,
+                subScenario: `watchFactory/in config file with error`,
+                commandLineArgs: ["-w", "--extendedDiagnostics"],
+                sys: () => createSystem({ watchFactory: "myplugin/../malicious" }),
+                changes: [
+                    {
+                        caption: "Change file",
+                        change: sys => sys.appendFile(`${projectRoot}/b.ts`, "export function foo() { }"),
+                        timeouts: sys => sys.runQueuedTimeoutCallbacks(),
+                    },
+                ]
+            });
+
+            verifyTscWatch({
+                scenario,
+                subScenario: `watchFactory/through commandline`,
+                commandLineArgs: ["-w", "--extendedDiagnostics", "--watchFactory", "myplugin"],
+                sys: () => createSystem(),
+                changes: [
+                    {
+                        caption: "Change file",
+                        change: sys => sys.appendFile(`${projectRoot}/b.ts`, "export function foo() { }"),
+                        timeouts: sys => sys.runQueuedTimeoutCallbacks(),
+                    },
+                ]
+            });
+
+            verifyTscWatch({
+                scenario,
+                subScenario: `watchFactory/when plugin not found`,
+                commandLineArgs: ["-w", "--extendedDiagnostics"],
+                sys: () => createSystem({ watchFactory: "myplugin" }),
+                changes: [
+                    {
+                        caption: "Change file",
+                        change: sys => sys.appendFile(`${projectRoot}/b.ts`, "export function foo() { }"),
+                        timeouts: sys => sys.runQueuedTimeoutCallbacks(),
+                    },
+                ]
+            });
+
+            verifyTscWatch({
+                scenario,
+                subScenario: `watchFactory/when plugin only implements watchFile`,
+                commandLineArgs: ["-w", "--extendedDiagnostics"],
+                sys: () => createSystem({ watchFactory: "myplugin" }),
+                changes: [
+                    {
+                        caption: "Change file",
+                        change: sys => sys.appendFile(`${projectRoot}/b.ts`, "export function foo() { }"),
+                        timeouts: sys => sys.runQueuedTimeoutCallbacks(),
+                    },
+                ]
+            });
+
+            function createSystem(watchOptions?: WatchOptions) {
+                const configFile: File = {
+                    path: `${projectRoot}/tsconfig.json`,
+                    content: JSON.stringify({ watchOptions })
+                };
+                const aTs: File = {
+                    path: `${projectRoot}/a.ts`,
+                    content: `export class a { prop = "hello"; foo() { return this.prop; } }`
+                };
+                const bTs: File = {
+                    path: `${projectRoot}/b.ts`,
+                    content: `export class b { prop = "hello"; foo() { return this.prop; } }`
+                };
+                return createWatchedSystem([aTs, bTs, configFile, libFile], { currentDirectory: projectRoot });
+            }
         });
     });
 }
