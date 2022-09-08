@@ -4092,7 +4092,12 @@ namespace ts.server {
 
             // If the host supports dynamic import, begin enabling the plugin asynchronously.
             if (this.host.importPlugin) {
-                const importPromise = project.beginEnablePluginAsync(pluginConfigEntry, searchPaths);
+                const importPromise: Promise<BeginEnablePluginResult> = importPlugin(
+                    pluginConfigEntry,
+                    searchPaths,
+                    this.host,
+                    s => this.logger.info(s),
+                );
                 this.pendingPluginEnablements ??= new Map();
                 let promises = this.pendingPluginEnablements.get(project);
                 if (!promises) this.pendingPluginEnablements.set(project, promises = []);
@@ -4101,7 +4106,12 @@ namespace ts.server {
             }
 
             // Otherwise, load the plugin using `require`
-            project.endEnablePlugin(project.beginEnablePluginSync(pluginConfigEntry, searchPaths));
+            project.endEnablePlugin(resolveModule(
+                pluginConfigEntry,
+                searchPaths,
+                this.host,
+                s => this.logger.info(s),
+            ));
         }
 
         /* @internal */

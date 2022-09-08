@@ -103,11 +103,7 @@ namespace ts.server {
     export type PluginModuleFactory = (mod: { typescript: typeof ts }) => PluginModule;
 
     /* @internal */
-    export interface BeginEnablePluginResult {
-        pluginConfigEntry: PluginImport;
-        resolvedModule: PluginModuleFactory | undefined;
-        errorLogs: string[] | undefined;
-    }
+    export type BeginEnablePluginResult = ImportPluginResult<PluginModuleFactory>;
 
     /**
      * The project root can be script info - if root is present,
@@ -241,8 +237,8 @@ namespace ts.server {
             return hasOneOrMoreJsAndNoTsFiles(this);
         }
 
-        public static resolveModule(moduleName: string, initialDir: string, host: ServerHost, log: (message: string) => void, logErrors?: (message: string) => void): {} | undefined {
-            return resolveModule(moduleName, initialDir, host, log, logErrors);
+        public static resolveModule(moduleName: string, initialDir: string, host: ServerHost, log: (message: string) => void): {} | undefined {
+            return resolveModule({ name: moduleName }, [initialDir], host, log).resolvedModule;
         }
 
         /*@internal*/
@@ -1604,46 +1600,6 @@ namespace ts.server {
 
                 this.enablePlugin({ name: globalPluginName, global: true } as PluginImport, searchPaths);
             }
-        }
-
-        /**
-         * Performs the initial steps of enabling a plugin by finding and instantiating the module for a plugin synchronously using 'require'.
-         */
-        /*@internal*/
-        beginEnablePluginSync(pluginConfigEntry: PluginImport, searchPaths: string[]): BeginEnablePluginResult {
-            Debug.assertIsDefined(this.projectService.host.require);
-
-            let errorLogs: string[] | undefined;
-            const log = (message: string) => this.projectService.logger.info(message);
-            const logError = (message: string) => {
-                (errorLogs ??= []).push(message);
-            };
-            const resolvedModule = firstDefined(searchPaths, searchPath =>
-                resolveModule(pluginConfigEntry.name, searchPath, this.projectService.host, log, logError) as PluginModuleFactory | undefined);
-            return { pluginConfigEntry, resolvedModule, errorLogs };
-        }
-
-        /**
-         * Performs the initial steps of enabling a plugin by finding and instantiating the module for a plugin asynchronously using dynamic `import`.
-         */
-        /*@internal*/
-        async beginEnablePluginAsync(pluginConfigEntry: PluginImport, searchPaths: string[]): Promise<BeginEnablePluginResult> {
-            Debug.assertIsDefined(this.projectService.host.importPlugin);
-
-            let errorLogs: string[] | undefined;
-            const log = (message: string) => this.projectService.logger.info(message);
-            const logError = (message: string) => {
-                (errorLogs ??= []).push(message);
-            };
-
-            let resolvedModule: PluginModuleFactory | undefined;
-            for (const searchPath of searchPaths) {
-                resolvedModule = await importPlugin(pluginConfigEntry.name, searchPath, this.projectService.host, log, logError) as PluginModuleFactory | undefined;
-                if (resolvedModule !== undefined) {
-                    break;
-                }
-            }
-            return { pluginConfigEntry, resolvedModule, errorLogs };
         }
 
         /**
