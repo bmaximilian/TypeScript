@@ -2719,7 +2719,7 @@ namespace ts {
     }
 
     /*@internal*/
-    export function setConfigFileInOptions(options: CompilerOptions, configFile: TsConfigSourceFile | undefined) {
+    export function setConfigFileInOptions(options: CompilerOptions | WatchOptions, configFile: TsConfigSourceFile | undefined) {
         if (configFile) {
             Object.defineProperty(options, "configFile", { enumerable: false, writable: false, value: configFile });
         }
@@ -2765,14 +2765,15 @@ namespace ts {
         const parsedConfig = parseConfig(json, sourceFile, host, basePath, configFileName, resolutionStack, errors, extendedConfigCache);
         const { raw } = parsedConfig;
         const options = extend(existingOptions, parsedConfig.options || {});
-        const watchOptions = existingWatchOptions && parsedConfig.watchOptions ?
-            extend(existingWatchOptions, parsedConfig.watchOptions) :
-            parsedConfig.watchOptions || existingWatchOptions;
+        const watchOptions = existingWatchOptions || parsedConfig.watchOptions ?
+            extend(existingWatchOptions || {}, parsedConfig.watchOptions || {}) :
+            undefined;
 
         options.configFilePath = configFileName && normalizeSlashes(configFileName);
         const configFileSpecs = getConfigFileSpecs();
         if (sourceFile) sourceFile.configFileSpecs = configFileSpecs;
         setConfigFileInOptions(options, sourceFile);
+        if (watchOptions) setConfigFileInOptions(watchOptions, sourceFile);
 
         const basePathForFileNames = normalizePath(configFileName ? directoryOfCombinedPath(configFileName, basePath) : basePath);
         return {
@@ -3023,9 +3024,9 @@ namespace ts {
                     raw.compileOnSave = baseRaw.compileOnSave;
                 }
                 ownConfig.options = assign({}, extendedConfig.options, ownConfig.options);
-                ownConfig.watchOptions = ownConfig.watchOptions && extendedConfig.watchOptions ?
+                ownConfig.watchOptions = ownConfig.watchOptions || extendedConfig.watchOptions ?
                     assign({}, extendedConfig.watchOptions, ownConfig.watchOptions) :
-                    ownConfig.watchOptions || extendedConfig.watchOptions;
+                    undefined;
                 // TODO extend type typeAcquisition
             }
         }

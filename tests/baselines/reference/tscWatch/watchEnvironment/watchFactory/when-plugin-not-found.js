@@ -28,6 +28,11 @@ Output::
 
 Current directory: /user/username/projects/myproject CaseSensitiveFileNames: false
 FileWatcher:: Added:: WatchInfo: /user/username/projects/myproject/tsconfig.json 2000 {"watchFactory":"myplugin"} Config file
+Loading myplugin from /user/username/projects/myproject (resolved to /user/username/projects/myproject/node_modules)
+Loading myplugin from /a/lib/tsc.js/../../.. (resolved to /a/lib/tsc.js/../../../node_modules)
+Failed to load module 'myplugin' from /user/username/projects/myproject/node_modules: Cannot find module myPlugin at /user/username/projects/myproject/node_modules
+Failed to load module 'myplugin' from /a/lib/tsc.js/../../../node_modules: Cannot find module myPlugin at /a/lib/tsc.js/../../../node_modules
+Couldn't find myplugin
 Synchronizing program
 CreatingProgramWith::
   roots: ["/user/username/projects/myproject/a.ts","/user/username/projects/myproject/b.ts"]
@@ -79,6 +84,11 @@ FsWatchesRecursive::
 /user/username/projects/myproject:
   {}
 
+
+Plugin Watches::
+WatchedFiles::
+WatchedDirectories:Recursive::
+WatchedDirectories::
 exitCode:: ExitStatus.undefined
 
 //// [/user/username/projects/myproject/a.js]
@@ -163,6 +173,11 @@ FsWatchesRecursive::
 /user/username/projects/myproject:
   {}
 
+
+Plugin Watches::
+WatchedFiles::
+WatchedDirectories:Recursive::
+WatchedDirectories::
 exitCode:: ExitStatus.undefined
 
 //// [/user/username/projects/myproject/b.js]

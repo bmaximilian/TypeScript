@@ -3098,7 +3098,7 @@ declare namespace ts {
         excludeDirectories?: string[];
         excludeFiles?: string[];
         watchFactory?: string;
-        [option: string]: CompilerOptionsValue | undefined;
+        [option: string]: CompilerOptionsValue | TsConfigSourceFile | undefined;
     }
     export interface TypeAcquisition {
         /**

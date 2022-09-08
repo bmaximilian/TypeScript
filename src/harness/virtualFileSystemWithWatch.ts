@@ -399,6 +399,7 @@ interface Array<T> { length: number; [n: number]: T; }`
                 tscWatchDirectory,
                 inodeWatching: !!this.inodeWatching,
                 sysLog: s => this.write(s + this.newLine),
+                getSystem: () => this,
             });
             this.watchFile = watchFile;
             this.watchDirectory = watchDirectory;

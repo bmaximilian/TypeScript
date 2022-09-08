@@ -516,54 +516,34 @@ namespace ts.projectSystem {
         });
 
         it("watchFactory in config file", () => {
-            const { host, session, aTs, bTs, } = createHostForPlugins(/*opts*/ undefined, { watchFactory: "myplugin" });
-            // host.require = (_initialPath, moduleName) => {
-            //     assert.equal(moduleName, "myplugin");
-            //     return {
-            //         // TODO:
-            //         module: () => ({
-            //             create(info: server.PluginCreateInfo) {
-            //                 info.serverHost.watchFile = watchFile;
-            //                 info.serverHost.watchDirectory = watchDirectory;
-            //                 return info.languageService;
-            //             }
-            //         }),
-            //         error: undefined
-            //     };
-            // };
+            const { host, session, watchFile, watchDirectory, aTs, bTs, } = createHostForPlugins(/*opts*/ undefined, { watchFactory: "myplugin" });
+            host.require = (_initialPath, moduleName) => {
+                assert.equal(moduleName, "myplugin");
+                return {
+                    module: { watchFile, watchDirectory },
+                    error: undefined
+                };
+            };
             openFilesForSession([aTs], session);
 
             // Change b.ts
             session.logger.info("Change file");
             host.writeFile(bTs.path, aTs.content);
-            // // Since we have overriden watch, this shouldnt do anything
-            // host.checkTimeoutQueueLength(0);
-
-            // // Actually invoke watches
-            // session.logger.info("Invoke plugin watches");
-            // watchedFiles.get(bTs.path)!.forEach(({ callback }) => callback(bTs.path, FileWatcherEventKind.Changed));
-            // Host should have updates queued
+            // Because files are watched at project service level it will use host options
             host.runQueuedTimeoutCallbacks();
 
             baselineTsserverLogs("watchEnvironment", "watchFactory in config file", session);
         });
 
         it("watchFactory as configuration of host", () => {
-            const { host, session, aTs, bTs, } = createHostForPlugins();
-            // host.require = (_initialPath, moduleName) => {
-            //     assert.equal(moduleName, "myplugin");
-            //     return {
-            //         // TODO:
-            //         module: () => ({
-            //             create(info: server.PluginCreateInfo) {
-            //                 info.serverHost.watchFile = watchFile;
-            //                 info.serverHost.watchDirectory = watchDirectory;
-            //                 return info.languageService;
-            //             }
-            //         }),
-            //         error: undefined
-            //     };
-            // };
+            const { host, session, watchFile, watchDirectory, watchedFiles, aTs, bTs, } = createHostForPlugins();
+            host.require = (_initialPath, moduleName) => {
+                assert.equal(moduleName, "myplugin");
+                return {
+                    module: { watchFile, watchDirectory },
+                    error: undefined
+                };
+            };
             session.executeCommandSeq<protocol.ConfigureRequest>({
                 command: protocol.CommandTypes.Configure,
                 arguments: { watchOptions: { watchFactory: "myplugin" } }
@@ -574,12 +554,12 @@ namespace ts.projectSystem {
             // Change b.ts
             session.logger.info("Change file");
             host.writeFile(bTs.path, aTs.content);
-            // // Since we have overriden watch, this shouldnt do anything
-            // host.checkTimeoutQueueLength(0);
+            // Since we have overriden watch, this shouldnt do anything
+            host.checkTimeoutQueueLength(0);
 
-            // // Actually invoke watches
-            // session.logger.info("Invoke plugin watches");
-            // watchedFiles.get(bTs.path)!.forEach(({ callback }) => callback(bTs.path, FileWatcherEventKind.Changed));
+            // Actually invoke watches
+            session.logger.info("Invoke plugin watches");
+            watchedFiles.get(bTs.path)!.forEach(({ callback }) => callback(bTs.path, FileWatcherEventKind.Changed));
             // Host should have updates queued
             host.runQueuedTimeoutCallbacks();
 
@@ -588,21 +568,7 @@ namespace ts.projectSystem {
 
         it("watchFactory as configuration of host with errors", () => {
             const { host, session, aTs, bTs, } = createHostForPlugins();
-            // host.require = (_initialPath, moduleName) => {
-            //     assert.equal(moduleName, "myplugin");
-            //     return {
-            //         // TODO:
-            //         module: () => ({
-            //             create(info: server.PluginCreateInfo) {
-            //                 info.serverHost.watchFile = watchFile;
-            //                 info.serverHost.watchDirectory = watchDirectory;
-            //                 return info.languageService;
-            //             }
-            //         }),
-            //         error: undefined
-            //     };
-            // };
-
+            host.require = notImplemented; // Should throw if called
             session.executeCommandSeq<protocol.ConfigureRequest>({
                 command: protocol.CommandTypes.Configure,
                 arguments: { watchOptions: { watchFactory: "myplugin/../malicious" } }
@@ -613,13 +579,6 @@ namespace ts.projectSystem {
             // Change b.ts
             session.logger.info("Change file");
             host.writeFile(bTs.path, aTs.content);
-            // // Since we have overriden watch, this shouldnt do anything
-            // host.checkTimeoutQueueLength(0);
-
-            // // Actually invoke watches
-            // session.logger.info("Invoke plugin watches");
-            // watchedFiles.get(bTs.path)!.forEach(({ callback }) => callback(bTs.path, FileWatcherEventKind.Changed));
-            // Host should have updates queued
             host.runQueuedTimeoutCallbacks();
 
             baselineTsserverLogs("watchEnvironment", "watchFactory as configuration of host with errors", session);
@@ -657,12 +616,14 @@ namespace ts.projectSystem {
             return { host, session, watchFile, watchDirectory, watchedFiles, aTs, bTs, };
 
             function watchFile(path: string, callback: FileWatcherCallback, pollingInterval?: PollingInterval, options?: WatchOptions) {
+                session.logger.logs.push(`Custom watchFile: ${path} ${pollingInterval} ${JSON.stringify(options)}`);
                 const watchedFileCallback: WatchedFileCallback = { callback, pollingInterval, options };
                 watchedFiles.add(path, watchedFileCallback);
                 return { close: () => watchedFiles.remove(path, watchedFileCallback) };
             }
 
             function watchDirectory(path: string, callback: DirectoryWatcherCallback, recursive?: boolean, options?: WatchOptions) {
+                session.logger.logs.push(`Custom watchDirectory: ${path} ${recursive} ${JSON.stringify(options)}`);
                 const watchedDirectoryCallback: WatchedDirectoryCallback = { callback, options };
                 (recursive ? watchedDirectoriesRecursive : watchedDirectories).add(path, watchedDirectoryCallback);
                 return { close: () => (recursive ? watchedDirectoriesRecursive : watchedDirectories).remove(path, watchedDirectoryCallback) };

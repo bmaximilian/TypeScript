@@ -63,9 +63,12 @@ Info 10   [00:00:33.000] Enabling plugin myplugin from candidate paths: /a/lib/t
 Info 11   [00:00:34.000] Loading myplugin from /a/lib/tsc.js/../../.. (resolved to /a/lib/tsc.js/../../../node_modules)
 Info 12   [00:00:35.000] Plugin validation succeeded
 Info 13   [00:00:36.000] FileWatcher:: Added:: WatchInfo: /user/username/projects/myproject/b.ts 500 undefined WatchType: Closed Script info
+Custom watchFile: /user/username/projects/myproject/b.ts 500 undefined
 Info 14   [00:00:37.000] Starting updateGraphWorker: Project: /user/username/projects/myproject/tsconfig.json
 Info 15   [00:00:38.000] FileWatcher:: Added:: WatchInfo: /a/lib/lib.d.ts 500 undefined WatchType: Closed Script info
+Custom watchFile: /a/lib/lib.d.ts 500 undefined
 Info 16   [00:00:39.000] DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject/node_modules/@types 1 undefined Project: /user/username/projects/myproject/tsconfig.json WatchType: Type roots
+Custom watchDirectory: /user/username/projects/myproject/node_modules/@types true undefined
 Info 17   [00:00:40.000] Elapsed:: *ms DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject/node_modules/@types 1 undefined Project: /user/username/projects/myproject/tsconfig.json WatchType: Type roots
 Info 18   [00:00:41.000] Finishing updateGraphWorker: Project: /user/username/projects/myproject/tsconfig.json Version: 1 structureChanged: true structureIsReused:: Not Elapsed:: *ms
 Info 19   [00:00:42.000] Project '/user/username/projects/myproject/tsconfig.json' (Configured)

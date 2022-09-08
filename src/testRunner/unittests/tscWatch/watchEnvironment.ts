@@ -694,11 +694,16 @@ namespace ts.tscWatch {
                 scenario,
                 subScenario: `watchFactory/in config file`,
                 commandLineArgs: ["-w", "--extendedDiagnostics"],
-                sys: () => createSystem({ watchFactory: "myplugin" }),
+                sys: () => createSystemWithFactory({ watchFactory: "myplugin" }),
                 changes: [
                     {
                         caption: "Change file",
                         change: sys => sys.appendFile(`${projectRoot}/b.ts`, "export function foo() { }"),
+                        timeouts: sys => sys.checkTimeoutQueueLength(0),
+                    },
+                    {
+                        caption: "Invoke plugin watches",
+                        change: sys => (sys as WatchFactorySystem).factoryData.watchedFiles.get(`${projectRoot}/b.ts`)!.forEach(({ callback }) => callback(`${projectRoot}/b.ts`, FileWatcherEventKind.Changed)),
                         timeouts: sys => sys.runQueuedTimeoutCallbacks(),
                     },
                 ]
@@ -708,7 +713,7 @@ namespace ts.tscWatch {
                 scenario,
                 subScenario: `watchFactory/in config file with error`,
                 commandLineArgs: ["-w", "--extendedDiagnostics"],
-                sys: () => createSystem({ watchFactory: "myplugin/../malicious" }),
+                sys: () => createSystemWithFactory({ watchFactory: "myplugin/../malicious" }),
                 changes: [
                     {
                         caption: "Change file",
@@ -722,11 +727,16 @@ namespace ts.tscWatch {
                 scenario,
                 subScenario: `watchFactory/through commandline`,
                 commandLineArgs: ["-w", "--extendedDiagnostics", "--watchFactory", "myplugin"],
-                sys: () => createSystem(),
+                sys: () => createSystemWithFactory(),
                 changes: [
                     {
                         caption: "Change file",
                         change: sys => sys.appendFile(`${projectRoot}/b.ts`, "export function foo() { }"),
+                        timeouts: sys => sys.checkTimeoutQueueLength(0),
+                    },
+                    {
+                        caption: "Invoke plugin watches",
+                        change: sys => (sys as WatchFactorySystem).factoryData.watchedFiles.get(`${projectRoot}/b.ts`)!.forEach(({ callback }) => callback(`${projectRoot}/b.ts`, FileWatcherEventKind.Changed)),
                         timeouts: sys => sys.runQueuedTimeoutCallbacks(),
                     },
                 ]
@@ -736,7 +746,17 @@ namespace ts.tscWatch {
                 scenario,
                 subScenario: `watchFactory/when plugin not found`,
                 commandLineArgs: ["-w", "--extendedDiagnostics"],
-                sys: () => createSystem({ watchFactory: "myplugin" }),
+                sys: () => {
+                    const system = createSystem({ watchFactory: "myplugin" });
+                    system.require = (initialPath, moduleName) => {
+                        assert.equal(moduleName, "myplugin");
+                        return {
+                            module: undefined,
+                            error: { message: `Cannot find module myPlugin at ${initialPath}` }
+                        };
+                    };
+                    return system;
+                },
                 changes: [
                     {
                         caption: "Change file",
@@ -748,7 +768,31 @@ namespace ts.tscWatch {
 
             verifyTscWatch({
                 scenario,
-                subScenario: `watchFactory/when plugin only implements watchFile`,
+                subScenario: `watchFactory/when plugin does not implements watchFile`,
+                commandLineArgs: ["-w", "--extendedDiagnostics"],
+                sys: () => {
+                    const system = createSystem({ watchFactory: "myplugin" });
+                    system.require = (_initialPath, moduleName) => {
+                        assert.equal(moduleName, "myplugin");
+                        return {
+                            module: { watchDirectory: system.factoryData.watchDirectory },
+                            error: undefined
+                        };
+                    };
+                    return system;
+                },
+                changes: [
+                    {
+                        caption: "Change file",
+                        change: sys => sys.appendFile(`${projectRoot}/b.ts`, "export function foo() { }"),
+                        timeouts: sys => sys.runQueuedTimeoutCallbacks(),
+                    },
+                ]
+            });
+
+            verifyTscWatch({
+                scenario,
+                subScenario: `watchFactory/when host does not implement require`,
                 commandLineArgs: ["-w", "--extendedDiagnostics"],
                 sys: () => createSystem({ watchFactory: "myplugin" }),
                 changes: [
@@ -759,6 +803,23 @@ namespace ts.tscWatch {
                     },
                 ]
             });
+
+            interface WatchedFileCallback {
+                callback: FileWatcherCallback;
+                pollingInterval: number | undefined;
+                options: WatchOptions | undefined;
+            }
+            interface WatchedDirectoryCallback {
+                callback: DirectoryWatcherCallback;
+                options: WatchOptions | undefined;
+            }
+            interface WatchFactorySystem extends WatchedSystem {
+                factoryData: {
+                    watchedFiles: MultiMap<string, WatchedFileCallback>;
+                    watchFile(path: string, callback: FileWatcherCallback, pollingInterval?: PollingInterval, options?: WatchOptions): FileWatcher;
+                    watchDirectory(path: string, callback: DirectoryWatcherCallback, recursive?: boolean, options?: WatchOptions): FileWatcher;
+                }
+            }
 
             function createSystem(watchOptions?: WatchOptions) {
                 const configFile: File = {
@@ -773,7 +834,52 @@ namespace ts.tscWatch {
                     path: `${projectRoot}/b.ts`,
                     content: `export class b { prop = "hello"; foo() { return this.prop; } }`
                 };
-                return createWatchedSystem([aTs, bTs, configFile, libFile], { currentDirectory: projectRoot });
+
+                const system = createWatchedSystem([aTs, bTs, configFile, libFile], { currentDirectory: projectRoot }) as WatchFactorySystem;
+                const watchedFiles = createMultiMap<string, WatchedFileCallback>();
+                const watchedDirectories = createMultiMap<string, WatchedDirectoryCallback>();
+                const watchedDirectoriesRecursive = createMultiMap<string, WatchedDirectoryCallback>();
+                const originalSerializeWatches = system.serializeWatches;
+                system.serializeWatches = serializeWatches;
+                system.factoryData = { watchedFiles, watchFile, watchDirectory };
+                return system;
+
+                function watchFile(path: string, callback: FileWatcherCallback, pollingInterval?: PollingInterval, options?: WatchOptions) {
+                    system.write(`Custom watchFile: ${path} ${pollingInterval} ${JSON.stringify(options)}\n`);
+                    const watchedFileCallback: WatchedFileCallback = { callback, pollingInterval, options };
+                    watchedFiles.add(path, watchedFileCallback);
+                    return { close: () => watchedFiles.remove(path, watchedFileCallback) };
+                }
+
+                function watchDirectory(path: string, callback: DirectoryWatcherCallback, recursive?: boolean, options?: WatchOptions) {
+                    system.write(`Custom watchDirectory: ${path} ${recursive} ${JSON.stringify(options)}\n`);
+                    const watchedDirectoryCallback: WatchedDirectoryCallback = { callback, options };
+                    (recursive ? watchedDirectoriesRecursive : watchedDirectories).add(path, watchedDirectoryCallback);
+                    return { close: () => (recursive ? watchedDirectoriesRecursive : watchedDirectories).remove(path, watchedDirectoryCallback) };
+                }
+                function serializeWatches(baseline: string[] = []) {
+                    originalSerializeWatches.call(system, baseline);
+                    baseline.push("", "Plugin Watches::");
+                    TestFSWithWatch.serializeMultiMap(baseline, "WatchedFiles", watchedFiles);
+                    TestFSWithWatch.serializeMultiMap(baseline, "WatchedDirectories:Recursive", watchedDirectoriesRecursive);
+                    TestFSWithWatch.serializeMultiMap(baseline, "WatchedDirectories", watchedDirectories);
+                    return baseline;
+                }
+            }
+
+            function createSystemWithFactory(watchOptions?: WatchOptions) {
+                const system = createSystem(watchOptions);
+                system.require = (_initialPath, moduleName) => {
+                    assert.equal(moduleName, "myplugin");
+                    return {
+                        module: {
+                            watchFile: system.factoryData.watchFile,
+                            watchDirectory: system.factoryData.watchDirectory,
+                        },
+                        error: undefined
+                    };
+                };
+                return system;
             }
         });
     });

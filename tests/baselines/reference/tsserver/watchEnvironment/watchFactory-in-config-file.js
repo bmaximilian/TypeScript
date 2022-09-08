@@ -61,12 +61,15 @@ Info 6    [00:00:29.000] Config: /user/username/projects/myproject/tsconfig.json
 }
 Info 7    [00:00:30.000] FileWatcher:: Close:: WatchInfo: /user/username/projects/myproject/tsconfig.json 2000 undefined Project: /user/username/projects/myproject/tsconfig.json WatchType: Config file
 Info 8    [00:00:31.000] FileWatcher:: Added:: WatchInfo: /user/username/projects/myproject/tsconfig.json 2000 {"watchFactory":"myplugin"} Project: /user/username/projects/myproject/tsconfig.json WatchType: Config file
+Custom watchFile: /user/username/projects/myproject/tsconfig.json 2000 {"watchFactory":"myplugin"}
 Info 9    [00:00:32.000] DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject 1 {"watchFactory":"myplugin"} Config: /user/username/projects/myproject/tsconfig.json WatchType: Wild card directory
+Custom watchDirectory: /user/username/projects/myproject true {"watchFactory":"myplugin"}
 Info 10   [00:00:33.000] Elapsed:: *ms DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject 1 {"watchFactory":"myplugin"} Config: /user/username/projects/myproject/tsconfig.json WatchType: Wild card directory
 Info 11   [00:00:34.000] FileWatcher:: Added:: WatchInfo: /user/username/projects/myproject/b.ts 500 undefined WatchType: Closed Script info
 Info 12   [00:00:35.000] Starting updateGraphWorker: Project: /user/username/projects/myproject/tsconfig.json
 Info 13   [00:00:36.000] FileWatcher:: Added:: WatchInfo: /a/lib/lib.d.ts 500 undefined WatchType: Closed Script info
 Info 14   [00:00:37.000] DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject/node_modules/@types 1 {"watchFactory":"myplugin"} Project: /user/username/projects/myproject/tsconfig.json WatchType: Type roots
+Custom watchDirectory: /user/username/projects/myproject/node_modules/@types true {"watchFactory":"myplugin"}
 Info 15   [00:00:38.000] Elapsed:: *ms DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject/node_modules/@types 1 {"watchFactory":"myplugin"} Project: /user/username/projects/myproject/tsconfig.json WatchType: Type roots
 Info 16   [00:00:39.000] Finishing updateGraphWorker: Project: /user/username/projects/myproject/tsconfig.json Version: 1 structureChanged: true structureIsReused:: Not Elapsed:: *ms
 Info 17   [00:00:40.000] Project '/user/username/projects/myproject/tsconfig.json' (Configured)
@@ -94,25 +97,25 @@ Info 20   [00:00:48.000] 		Projects: /user/username/projects/myproject/tsconfig.
 After request
 
 PolledWatches::
-/user/username/projects/myproject/node_modules/@types:
-  {"pollingInterval":500}
 
 FsWatches::
-/user/username/projects/myproject/tsconfig.json:
-  {}
 /user/username/projects/myproject/b.ts:
   {}
 /a/lib/lib.d.ts:
   {}
 
 FsWatchesRecursive::
-/user/username/projects/myproject:
-  {}
 
 
 Plugin Watches::
 WatchedFiles::
+/user/username/projects/myproject/tsconfig.json:
+  {"pollingInterval":2000,"options":{"watchFactory":"myplugin"}}
 WatchedDirectories:Recursive::
+/user/username/projects/myproject:
+  {"options":{"watchFactory":"myplugin"}}
+/user/username/projects/myproject/node_modules/@types:
+  {"options":{"watchFactory":"myplugin"}}
 WatchedDirectories::
 Info 20   [00:00:49.000] response:
     {
@@ -129,25 +132,25 @@ export class a { prop = "hello"; foo() { return this.prop; } }
 
 
 PolledWatches::
-/user/username/projects/myproject/node_modules/@types:
-  {"pollingInterval":500}
 
 FsWatches::
-/user/username/projects/myproject/tsconfig.json:
-  {}
 /user/username/projects/myproject/b.ts:
   {}
 /a/lib/lib.d.ts:
   {}
 
 FsWatchesRecursive::
-/user/username/projects/myproject:
-  {}
 
 
 Plugin Watches::
 WatchedFiles::
+/user/username/projects/myproject/tsconfig.json:
+  {"pollingInterval":2000,"options":{"watchFactory":"myplugin"}}
 WatchedDirectories:Recursive::
+/user/username/projects/myproject:
+  {"options":{"watchFactory":"myplugin"}}
+/user/username/projects/myproject/node_modules/@types:
+  {"options":{"watchFactory":"myplugin"}}
 WatchedDirectories::
 Info 26   [00:00:58.000] Running: /user/username/projects/myproject/tsconfig.json
 Info 27   [00:00:59.000] Starting updateGraphWorker: Project: /user/username/projects/myproject/tsconfig.json
@@ -173,23 +176,23 @@ Info 33   [00:01:16.000] 		Projects: /user/username/projects/myproject/tsconfig.
 After running timeout callbacks
 
 PolledWatches::
-/user/username/projects/myproject/node_modules/@types:
-  {"pollingInterval":500}
 
 FsWatches::
-/user/username/projects/myproject/tsconfig.json:
-  {}
 /user/username/projects/myproject/b.ts:
   {}
 /a/lib/lib.d.ts:
   {}
 
 FsWatchesRecursive::
-/user/username/projects/myproject:
-  {}
 
 
 Plugin Watches::
 WatchedFiles::
+/user/username/projects/myproject/tsconfig.json:
+  {"pollingInterval":2000,"options":{"watchFactory":"myplugin"}}
 WatchedDirectories:Recursive::
+/user/username/projects/myproject:
+  {"options":{"watchFactory":"myplugin"}}
+/user/username/projects/myproject/node_modules/@types:
+  {"options":{"watchFactory":"myplugin"}}
 WatchedDirectories::

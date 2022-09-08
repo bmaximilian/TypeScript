@@ -6681,8 +6681,10 @@ namespace ts {
         excludeDirectories?: string[];
         excludeFiles?: string[];
         watchFactory?: string;
+        /** configFile is set as non enumerable property so as to avoid checking of json source files */
+        /* @internal */ readonly configFile?: TsConfigSourceFile;
 
-        [option: string]: CompilerOptionsValue | undefined;
+        [option: string]: CompilerOptionsValue | TsConfigSourceFile | undefined;
     }
 
     export interface TypeAcquisition {
