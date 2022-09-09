@@ -259,15 +259,6 @@ namespace ts.server {
             sys.gc = () => global.gc?.();
         }
 
-        sys.require = (initialDir: string, moduleName: string): ModuleImportResult => {
-            try {
-                return { module: require(resolveJSModule(moduleName, initialDir, sys)), error: undefined };
-            }
-            catch (error) {
-                return { module: undefined, error };
-            }
-        };
-
         let cancellationToken: ServerCancellationToken;
         try {
             const factory = require("./cancellationToken");
