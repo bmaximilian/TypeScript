@@ -4187,6 +4187,13 @@ declare namespace ts {
     }
     export type FileWatcherCallback = (fileName: string, eventKind: FileWatcherEventKind, modifiedTime?: Date) => void;
     export type DirectoryWatcherCallback = (fileName: string) => void;
+    export type UserWatchFactory = (mod: {
+        typescript: typeof ts;
+    }) => UserWatchModule;
+    export interface UserWatchModule {
+        watchFile?(fileName: string, callback: FileWatcherCallback, pollingInterval: number, options: WatchOptions | undefined): FileWatcher;
+        watchDirectory?(fileName: string, callback: DirectoryWatcherCallback, recursive: boolean, options: WatchOptions | undefined): FileWatcher;
+    }
     export interface System {
         args: string[];
         newLine: string;

@@ -520,7 +520,7 @@ namespace ts.projectSystem {
             host.require = (_initialPath, moduleName) => {
                 assert.equal(moduleName, "myplugin");
                 return {
-                    module: { watchFile, watchDirectory },
+                    module: () => ({ watchFile, watchDirectory }),
                     error: undefined
                 };
             };
@@ -540,7 +540,7 @@ namespace ts.projectSystem {
             host.require = (_initialPath, moduleName) => {
                 assert.equal(moduleName, "myplugin");
                 return {
-                    module: { watchFile, watchDirectory },
+                    module: () => ({ watchFile, watchDirectory }),
                     error: undefined
                 };
             };

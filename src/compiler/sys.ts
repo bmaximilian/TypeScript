@@ -920,6 +920,12 @@ namespace ts {
         getSystem: () => System;
     }
 
+    export type UserWatchFactory = (mod: { typescript: typeof ts }) => UserWatchModule;
+    export interface UserWatchModule {
+        watchFile?(fileName: string, callback: FileWatcherCallback, pollingInterval: number, options: WatchOptions | undefined): FileWatcher;
+        watchDirectory?(fileName: string, callback: DirectoryWatcherCallback, recursive: boolean, options: WatchOptions | undefined): FileWatcher;
+    }
+
     /*@internal*/
     export function createSystemWatchFunctions({
         pollingWatchFileWorker,
@@ -950,13 +956,9 @@ namespace ts {
         let hitSystemWatcherLimit = false;
         let reportErrorOnMissingRequire = true;
 
-        interface UserWatchFactory {
-            watchFile(fileName: string, callback: FileWatcherCallback, pollingInterval: PollingInterval, options: WatchOptions | undefined): FileWatcher;
-            watchDirectory(fileName: string, callback: DirectoryWatcherCallback, recursive: boolean, options: WatchOptions | undefined): FileWatcher;
-        }
         type PathKey = string & { __pathKey: any; };
-        const watchFactories = new Map<string, ESMap<PathKey, UserWatchFactory | false>>();
-        let pendingFactories: Map<ESMap<PathKey, Promise<UserWatchFactory | undefined>>> | undefined;
+        const watchModules = new Map<string, ESMap<PathKey, UserWatchModule | false>>();
+        let pendingModules: Map<ESMap<PathKey, Promise<UserWatchModule | undefined>>> | undefined;
         return {
             watchFile: (fileName, callback, pollingInterval, options) =>
                 createWatcherConsideringFactory(
@@ -972,7 +974,7 @@ namespace ts {
 
         function createWatcherConsideringFactory(
             options: WatchOptions | undefined,
-            createWatcher: (factory?: UserWatchFactory) => FileWatcher,
+            createWatcher: (factory?: UserWatchModule) => FileWatcher,
         ): FileWatcher {
             if (!options?.watchFactory) return createWatcher();
             const system = getSystem();
@@ -993,11 +995,11 @@ namespace ts {
                 combinePaths(system.getExecutingFilePath(), "../../..")
             ];
             const pathKey = searchPaths.join("\n") as PathKey;
-            const existingResolved = watchFactories.get(options.watchFactory)?.get(pathKey);
+            const existingResolved = watchModules.get(options.watchFactory)?.get(pathKey);
             if (existingResolved !== undefined) return createWatcher(existingResolved || undefined);
 
             // Try the promise that was not resolved
-            const existingPromise = pendingFactories?.get(options.watchFactory)?.get(pathKey);
+            const existingPromise = pendingModules?.get(options.watchFactory)?.get(pathKey);
             return existingPromise ?
                 createWatcherFromPromise(existingPromise, createWatcher) :
                 system.importPlugin ?
@@ -1013,20 +1015,20 @@ namespace ts {
 
         function importFactory(watchFactory: string, searchPaths: string[], system: System, pathKey: PathKey) {
             const result = importPlugin<UserWatchFactory>({ name: watchFactory }, searchPaths, system, sysLog).then(resolved => {
-                if (pendingFactories) {
-                    const perPath = pendingFactories.get(watchFactory);
+                if (pendingModules) {
+                    const perPath = pendingModules.get(watchFactory);
                     if (perPath?.delete(pathKey)) {
                         if (!perPath.size) {
-                            pendingFactories.delete(watchFactory);
-                            if (!pendingFactories.size) pendingFactories = undefined;
+                            pendingModules.delete(watchFactory);
+                            if (!pendingModules.size) pendingModules = undefined;
                         }
                     }
                 }
                 return setImportPluginResult(pathKey, resolved);
             });
-            (pendingFactories ??= new Map()).set(
+            (pendingModules ??= new Map()).set(
                 watchFactory,
-                (pendingFactories.get(watchFactory) || new Map()).set(pathKey, result)
+                (pendingModules.get(watchFactory) || new Map()).set(pathKey, result)
             );
             return result;
         }
@@ -1035,20 +1037,27 @@ namespace ts {
             pathKey: PathKey,
             { resolvedModule, errorLogs, pluginConfigEntry }: ImportPluginResult<UserWatchFactory>,
         ) {
-            watchFactories.set(
-                pluginConfigEntry.name,
-                (watchFactories.get(pluginConfigEntry.name) || new Map()).set(pathKey, resolvedModule || false),
-            );
+            let userModule: UserWatchModule | undefined;
             if (!resolvedModule) {
                 forEach(errorLogs, sysLog);
                 sysLog(`Couldn't find ${pluginConfigEntry.name}`);
             }
-            return resolvedModule;
+            else if (typeof resolvedModule !== "function") {
+                sysLog(`Skipped loading plugin ${pluginConfigEntry.name} because it did not expose a proper factory function`);
+            }
+            else {
+                userModule = resolvedModule({ typescript: ts });
+            }
+            watchModules.set(
+                pluginConfigEntry.name,
+                (watchModules.get(pluginConfigEntry.name) || new Map()).set(pathKey, userModule || false),
+            );
+            return userModule;
         }
 
         function createWatcherFromPromise(
-            promise: Promise<UserWatchFactory | undefined>,
-            createWatcher: (factory?: UserWatchFactory) => FileWatcher,
+            promise: Promise<UserWatchModule | undefined>,
+            createWatcher: (factory?: UserWatchModule) => FileWatcher,
         ): FileWatcher {
             let isClosed = false;
             let watcher: FileWatcher | undefined;
@@ -1065,8 +1074,8 @@ namespace ts {
             };
         }
 
-        function watchFile(factory: UserWatchFactory | undefined, fileName: string, callback: FileWatcherCallback, pollingInterval: PollingInterval, options: WatchOptions | undefined): FileWatcher {
-            if (typeof factory?.watchFile === "function") return factory.watchFile(fileName, callback, pollingInterval, options);
+        function watchFile(userModule: UserWatchModule | undefined, fileName: string, callback: FileWatcherCallback, pollingInterval: PollingInterval, options: WatchOptions | undefined): FileWatcher {
+            if (typeof userModule?.watchFile === "function") return userModule.watchFile(fileName, callback, pollingInterval, options);
             options = updateOptionsForWatchFile(options, useNonPollingWatchers);
             const watchFileKind = Debug.checkDefined(options.watchFile);
             switch (watchFileKind) {
@@ -1146,8 +1155,8 @@ namespace ts {
             };
         }
 
-        function watchDirectory(factory: UserWatchFactory | undefined, directoryName: string, callback: DirectoryWatcherCallback, recursive: boolean, options: WatchOptions | undefined): FileWatcher {
-            if (typeof factory?.watchDirectory === "function") return factory.watchDirectory(directoryName, callback, recursive, options);
+        function watchDirectory(userModule: UserWatchModule | undefined, directoryName: string, callback: DirectoryWatcherCallback, recursive: boolean, options: WatchOptions | undefined): FileWatcher {
+            if (typeof userModule?.watchDirectory === "function") return userModule.watchDirectory(directoryName, callback, recursive, options);
             if (fsSupportsRecursiveFsWatch) {
                 return fsWatch(
                     directoryName,
