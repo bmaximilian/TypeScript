@@ -4193,6 +4193,7 @@ declare namespace ts {
     export interface UserWatchModule {
         watchFile?(fileName: string, callback: FileWatcherCallback, pollingInterval: number, options: WatchOptions | undefined): FileWatcher;
         watchDirectory?(fileName: string, callback: DirectoryWatcherCallback, recursive: boolean, options: WatchOptions | undefined): FileWatcher;
+        onConfigurationChanged?(config: any): void;
     }
     export interface System {
         args: string[];

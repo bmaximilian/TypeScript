@@ -4198,6 +4198,7 @@ namespace ts.server {
         configurePlugin(args: protocol.ConfigurePluginRequestArguments) {
             // For any projects that already have the plugin loaded, configure the plugin
             this.forEachEnabledProject(project => project.onPluginConfigurationChanged(args.pluginName, args.configuration));
+            this.host.onPluginConfigurationChanged?.(args.pluginName, args.configuration);
 
             // Also save the current configuration to pass on to any projects that are yet to be loaded.
             // If a plugin is configured twice, only the latest configuration will be remembered.

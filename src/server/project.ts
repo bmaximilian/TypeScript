@@ -1664,8 +1664,8 @@ namespace ts.server {
 
         /*@internal*/
         onPluginConfigurationChanged(pluginName: string, configuration: any) {
-            this.plugins.filter(plugin => plugin.name === pluginName).forEach(plugin => {
-                if (plugin.module.onConfigurationChanged) {
+            this.plugins.forEach(plugin => {
+                if (plugin.name === pluginName && plugin.module.onConfigurationChanged) {
                     plugin.module.onConfigurationChanged(configuration);
                 }
             });

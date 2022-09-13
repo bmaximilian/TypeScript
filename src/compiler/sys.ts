@@ -924,6 +924,7 @@ namespace ts {
     export interface UserWatchModule {
         watchFile?(fileName: string, callback: FileWatcherCallback, pollingInterval: number, options: WatchOptions | undefined): FileWatcher;
         watchDirectory?(fileName: string, callback: DirectoryWatcherCallback, recursive: boolean, options: WatchOptions | undefined): FileWatcher;
+        onConfigurationChanged?(config: any): void;
     }
 
     /*@internal*/
@@ -945,7 +946,7 @@ namespace ts {
         inodeWatching,
         sysLog,
         getSystem,
-    }: CreateSystemWatchFunctions): { watchFile: HostWatchFile; watchDirectory: HostWatchDirectory; } {
+    }: CreateSystemWatchFunctions): { watchFile: HostWatchFile; watchDirectory: HostWatchDirectory; onPluginConfigurationChanged: NonNullable<System["onPluginConfigurationChanged"]>; } {
         const pollingWatches = new Map<string, SingleFileWatcher<FileWatcherCallback>>();
         const fsWatches = new Map<string, SingleFileWatcher<FsWatchCallback>>();
         const fsWatchesRecursive = new Map<string, SingleFileWatcher<FsWatchCallback>>();
@@ -970,7 +971,16 @@ namespace ts {
                     options,
                     factory => watchDirectory(factory, directoryName, callback, recursive, options)
                 ),
+            onPluginConfigurationChanged,
         };
+
+        function onPluginConfigurationChanged(pluginName: string, config: any) {
+            pendingModules?.get(pluginName)?.forEach(promise =>
+                promise.then(factory => factory?.onConfigurationChanged?.(config)));
+            watchModules.get(pluginName)?.forEach(factory => {
+                if (factory) factory.onConfigurationChanged?.(config);
+            });
+        }
 
         function createWatcherConsideringFactory(
             options: WatchOptions | undefined,
@@ -1567,6 +1577,7 @@ namespace ts {
         /*@internal*/ bufferFrom?(input: string, encoding?: string): Buffer;
         /*@internal*/ require?(baseDir: string, moduleName: string): ModuleImportResult;
         /*@internal*/ importPlugin?(root: string, moduleName: string): Promise<ModuleImportResult>;
+        /*@internal*/ onPluginConfigurationChanged?(pluginName: string, configuration: any): void;
 
         // For testing
         /*@internal*/ now?(): Date;
@@ -1642,7 +1653,7 @@ namespace ts {
 
             const fsSupportsRecursiveFsWatch = isNode4OrLater && (process.platform === "win32" || process.platform === "darwin");
             const getCurrentDirectory = memoize(() => process.cwd());
-            const { watchFile, watchDirectory } = createSystemWatchFunctions({
+            const { watchFile, watchDirectory, onPluginConfigurationChanged } = createSystemWatchFunctions({
                 pollingWatchFileWorker: fsWatchFileWorker,
                 getModifiedTime,
                 setTimeout,
@@ -1680,6 +1691,7 @@ namespace ts {
                 writeFile,
                 watchFile,
                 watchDirectory,
+                onPluginConfigurationChanged,
                 resolvePath: path => _path.resolve(path),
                 fileExists,
                 directoryExists,
