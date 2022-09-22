@@ -690,11 +690,10 @@ namespace ts.tscWatch {
         });
 
         describe("watchFactory", () => {
-            verifyTscWatch({
-                scenario,
+            verifyWatchFactory({
                 subScenario: `watchFactory/in config file`,
                 commandLineArgs: ["-w", "--extendedDiagnostics"],
-                sys: () => createSystemWithFactory({ watchFactory: "myplugin" }),
+                sys: createSystemWithFactory,
                 changes: [
                     {
                         caption: "Change file",
@@ -707,13 +706,12 @@ namespace ts.tscWatch {
                         timeouts: sys => sys.runQueuedTimeoutCallbacks(),
                     },
                 ]
-            });
+            }, "myplugin");
 
-            verifyTscWatch({
-                scenario,
+            verifyWatchFactory({
                 subScenario: `watchFactory/in config file with error`,
                 commandLineArgs: ["-w", "--extendedDiagnostics"],
-                sys: () => createSystemWithFactory({ watchFactory: "myplugin/../malicious" }),
+                sys: createSystemWithFactory,
                 changes: [
                     {
                         caption: "Change file",
@@ -721,12 +719,10 @@ namespace ts.tscWatch {
                         timeouts: sys => sys.runQueuedTimeoutCallbacks(),
                     },
                 ]
-            });
+            }, "myplugin/../malicious");
 
-            verifyTscWatch({
-                scenario,
+            verifyWatchFactoryCommandLine({
                 subScenario: `watchFactory/through commandline`,
-                commandLineArgs: ["-w", "--extendedDiagnostics", "--watchFactory", "myplugin"],
                 sys: () => createSystemWithFactory(),
                 changes: [
                     {
@@ -740,14 +736,24 @@ namespace ts.tscWatch {
                         timeouts: sys => sys.runQueuedTimeoutCallbacks(),
                     },
                 ]
-            });
+            }, "myplugin");
 
-            verifyTscWatch({
-                scenario,
+            verifyWatchFactoryCommandLine({
+                subScenario: `watchFactory/through commandline with error`,
+                sys: () => {
+                    // Patch to not throw exception so the tests can run and baseline
+                    const sys = createSystemWithFactory();
+                    sys.exit = exitCode => sys.exitCode = exitCode;
+                    return sys;
+                },
+                changes: emptyArray
+            }, "myplugin/../malicious");
+
+            verifyWatchFactory({
                 subScenario: `watchFactory/when plugin not found`,
                 commandLineArgs: ["-w", "--extendedDiagnostics"],
-                sys: () => {
-                    const system = createSystem({ watchFactory: "myplugin" });
+                sys: watchOptions => {
+                    const system = createSystem(watchOptions);
                     system.require = (initialPath, moduleName) => {
                         assert.equal(moduleName, "myplugin");
                         return {
@@ -764,14 +770,13 @@ namespace ts.tscWatch {
                         timeouts: sys => sys.runQueuedTimeoutCallbacks(),
                     },
                 ]
-            });
+            }, "myplugin");
 
-            verifyTscWatch({
-                scenario,
+            verifyWatchFactory({
                 subScenario: `watchFactory/when plugin does not implements watchFile`,
                 commandLineArgs: ["-w", "--extendedDiagnostics"],
-                sys: () => {
-                    const system = createSystem({ watchFactory: "myplugin" });
+                sys: watchOptions => {
+                    const system = createSystem(watchOptions);
                     system.require = (_initialPath, moduleName) => {
                         assert.equal(moduleName, "myplugin");
                         return {
@@ -788,14 +793,13 @@ namespace ts.tscWatch {
                         timeouts: sys => sys.runQueuedTimeoutCallbacks(),
                     },
                 ]
-            });
+            }, "myplugin");
 
-            verifyTscWatch({
-                scenario,
+            verifyWatchFactory({
                 subScenario: `watchFactory/when plugin doesnt return factory function`,
                 commandLineArgs: ["-w", "--extendedDiagnostics"],
-                sys: () => {
-                    const system = createSystem({ watchFactory: "myplugin" });
+                sys: watchOptions => {
+                    const system = createSystem(watchOptions);
                     system.require = (_initialPath, moduleName) => {
                         assert.equal(moduleName, "myplugin");
                         return {
@@ -812,13 +816,12 @@ namespace ts.tscWatch {
                         timeouts: sys => sys.runQueuedTimeoutCallbacks(),
                     },
                 ]
-            });
+            }, "myplugin");
 
-            verifyTscWatch({
-                scenario,
+            verifyWatchFactory({
                 subScenario: `watchFactory/when host does not implement require`,
                 commandLineArgs: ["-w", "--extendedDiagnostics"],
-                sys: () => createSystem({ watchFactory: "myplugin" }),
+                sys: watchoptions => createSystem(watchoptions),
                 changes: [
                     {
                         caption: "Change file",
@@ -826,7 +829,7 @@ namespace ts.tscWatch {
                         timeouts: sys => sys.runQueuedTimeoutCallbacks(),
                     },
                 ]
-            });
+            }, "myplugin");
 
             interface WatchedFileCallback {
                 callback: FileWatcherCallback;
@@ -904,6 +907,40 @@ namespace ts.tscWatch {
                     };
                 };
                 return system;
+            }
+
+            function verifyWatchFactory(
+                input: Omit<VerifyTscWatch, "sys" | "scenario"> & { sys: (watchOptions?: WatchOptions) => WatchedSystem; },
+                watchFactory: string,
+            ) {
+                verifyTscWatch({
+                    scenario,
+                    ...input,
+                    sys: () => input.sys({ watchFactory }),
+                });
+                verifyTscWatch({
+                    scenario,
+                    ...input,
+                    subScenario: `${input.subScenario} object`,
+                    sys: () => input.sys({ watchFactory: { name: watchFactory, myconfig: "somethingelse" } as PluginImport }),
+                });
+            }
+
+            function verifyWatchFactoryCommandLine(
+                input: Omit<VerifyTscWatch, "commandLineArgs" | "scenario">,
+                watchFactory: string,
+            ) {
+                verifyTscWatch({
+                    scenario,
+                    ...input,
+                    commandLineArgs: ["-w", "--extendedDiagnostics", "--watchFactory", watchFactory],
+                });
+                verifyTscWatch({
+                    scenario,
+                    ...input,
+                    subScenario: `${input.subScenario} object`,
+                    commandLineArgs: ["-w", "--extendedDiagnostics", "--watchFactory", JSON.stringify({ name: watchFactory, myconfig: "somethingelse" })],
+                });
             }
         });
     });

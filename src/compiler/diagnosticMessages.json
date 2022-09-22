@@ -4225,7 +4225,7 @@
         "category": "Error",
         "code": 5095
     },
-    "'watchFactory' cannot specify anything but package name.": {
+    "'watchFactory' name can only be package name.": {
         "category": "Error",
         "code": 5096
     },

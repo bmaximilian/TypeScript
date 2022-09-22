@@ -185,17 +185,38 @@ namespace ts {
         },
         {
             name: "watchFactory",
-            type: "string",
+            type: "string | object",
             category: Diagnostics.Watch_and_Build_Modes,
             description: Diagnostics.Specify_which_factory_to_invoke_watchFile_and_watchDirectory_on,
-            extraValidation: watchFactoryToDiagnostic
+            extraValidation: watchFactoryToDiagnostic,
+            elementOptions: commandLineOptionsToMap([
+                {
+                    name: "name",
+                    type: "string",
+                    description: Diagnostics.Specify_which_factory_to_invoke_watchFile_and_watchDirectory_on,
+                    extraValidation: watchFactoryNameToDiagnostic
+                },
+            ]),
         },
     ];
 
-    function watchFactoryToDiagnostic(watchFactory: string): [DiagnosticMessage] | undefined {
-        return parsePackageName(watchFactory).rest ?
-            [Diagnostics.watchFactory_cannot_specify_anything_but_package_name] :
+    function watchFactoryNameToDiagnostic(watchFactory: string): [DiagnosticMessage] | undefined {
+        return !watchFactory || parsePackageName(watchFactory).rest ?
+            [Diagnostics.watchFactory_name_can_only_be_package_name] :
             undefined;
+    }
+
+    function watchFactoryToDiagnostic(watchFactory: string | PluginImport, valueExpression: Expression | undefined) {
+        const watchFactoryName = isString(watchFactory) ? watchFactory : watchFactory.name;
+        const diagnostics = watchFactoryNameToDiagnostic(watchFactoryName);
+        if (!diagnostics || !valueExpression || !isObjectLiteralExpression(valueExpression)) return diagnostics;
+        const errorNode = forEach(valueExpression.properties, element => isPropertyAssignment(element) &&
+            !isComputedNonLiteralName(element.name) &&
+            unescapeLeadingUnderscores(getTextOfPropertyName(element.name)) === "name" ?
+            element.initializer :
+            undefined
+        );
+        return errorNode ? { diagnostics, errorNode } : diagnostics;
     }
 
     /* @internal */
@@ -1570,9 +1591,32 @@ namespace ts {
                 return mapDefined(values, v => validateJsonOptionValue(opt.element, parseInt(v), errors));
             case "string":
                 return mapDefined(values, v => validateJsonOptionValue(opt.element, v || "", errors));
+            case "boolean":
+            case "object":
+            case "string | object":
+                return Debug.fail(`List of ${opt.element.type} is not yet supported.`);
             default:
                 return mapDefined(values, v => parseCustomTypeOption(opt.element as CommandLineOptionOfCustomType, v, errors));
         }
+    }
+
+    /* @internal */
+    export function parseObjectTypeOption(opt: CommandLineOptionOfObjectType, value: string | undefined, errors: Push<Diagnostic>): { value: CompilerOptionsValue | undefined } | undefined {
+        if (value === undefined) return undefined;
+        value = trimString(value);
+        if (startsWith(value, "-")) return undefined;
+        if (opt.type === "string | object" && !startsWith(value, "{")) {
+            return { value: validateJsonOptionValue(opt, value, errors) };
+        }
+        try {
+            const parsedValue = JSON.parse(value);
+            if (typeof parsedValue === "object") {
+                return { value: validateJsonOptionValue(opt, parsedValue, errors) };
+            }
+        }
+        catch { } // eslint-disable-line no-empty
+        errors.push(createCompilerDiagnostic(Diagnostics.Argument_for_0_option_must_be_Colon_1, opt.name, getCompilerOptionValueTypeString(opt)));
+        return { value: undefined };
     }
 
     /*@internal*/
@@ -1748,9 +1792,15 @@ namespace ts {
                             i++;
                         }
                         break;
+                    case "object":
+                    case "string | object":
+                        const objectResult = parseObjectTypeOption(opt, args[i], errors);
+                        options[opt.name] = objectResult?.value;
+                        if (objectResult) i++;
+                        break;
                     // If not a primitive, the possible types are specified in what is effectively a map of options.
                     default:
-                        options[opt.name] = parseCustomTypeOption(opt as CommandLineOptionOfCustomType, args[i], errors);
+                        options[opt.name] = parseCustomTypeOption(opt, args[i], errors);
                         i++;
                         break;
                 }
@@ -1988,7 +2038,7 @@ namespace ts {
         return commandLineTypeAcquisitionMapCache || (commandLineTypeAcquisitionMapCache = commandLineOptionsToMap(typeAcquisitionDeclarations));
     }
 
-    let _tsconfigRootOptions: TsConfigOnlyOption;
+    let _tsconfigRootOptions: CommandLineOptionOfObjectType;
     function getTsconfigRootOptionsMap() {
         if (_tsconfigRootOptions === undefined) {
             _tsconfigRootOptions = {
@@ -2149,7 +2199,7 @@ namespace ts {
         return convertPropertyValueToJson(rootExpression, knownRootOptions);
 
         function isRootOptionMap(knownOptions: ESMap<string, CommandLineOption> | undefined) {
-            return knownRootOptions && (knownRootOptions as TsConfigOnlyOption).elementOptions === knownOptions;
+            return knownRootOptions && (knownRootOptions as CommandLineOptionOfObjectType).elementOptions === knownOptions;
         }
 
         function convertObjectLiteralExpressionToJson(
@@ -2251,7 +2301,7 @@ namespace ts {
                     if (!isDoubleQuotedString(valueExpression)) {
                         errors.push(createDiagnosticForNodeInSourceFile(sourceFile, valueExpression, Diagnostics.String_literal_with_double_quotes_expected));
                     }
-                    reportInvalidOptionValue(option && (isString(option.type) && option.type !== "string"));
+                    reportInvalidOptionValue(option && isString(option.type) && option.type !== "string" && !isCommandLineOptionTypeStringOr(option));
                     const text = (valueExpression as StringLiteral).text;
                     if (option && !isString(option.type)) {
                         const customOption = option as CommandLineOptionOfCustomType;
@@ -2280,7 +2330,7 @@ namespace ts {
                     return validateValue(-Number(((valueExpression as PrefixUnaryExpression).operand as NumericLiteral).text));
 
                 case SyntaxKind.ObjectLiteralExpression:
-                    reportInvalidOptionValue(option && option.type !== "object");
+                    reportInvalidOptionValue(option && option.type !== "object" && !isCommandLineOptionTypeStringOr(option));
                     const objectLiteralExpression = valueExpression as ObjectLiteralExpression;
 
                     // Currently having element option declaration in the tsconfig with type "object"
@@ -2290,7 +2340,7 @@ namespace ts {
                     // vs what we set in the json
                     // If need arises, we can modify this interface and callbacks as needed
                     if (option) {
-                        const { elementOptions, extraKeyDiagnostics, name: optionName } = option as TsConfigOnlyOption;
+                        const { elementOptions, extraKeyDiagnostics, name: optionName } = option as CommandLineOptionOfObjectType;
                         return validateValue(convertObjectLiteralExpressionToJson(objectLiteralExpression,
                             elementOptions, extraKeyDiagnostics, optionName));
                     }
@@ -2319,9 +2369,11 @@ namespace ts {
 
             function validateValue(value: CompilerOptionsValue) {
                 if (!invalidReported) {
-                    const diagnostic = option?.extraValidation?.(value);
-                    if (diagnostic) {
-                        errors.push(createDiagnosticForNodeInSourceFile(sourceFile, valueExpression, ...diagnostic));
+                    const result = option?.extraValidation?.(value, valueExpression);
+                    if (result) {
+                        const diagnostics = isArray(result) ? result : result.diagnostics;
+                        const errorNode = isArray(result) ? valueExpression : result.errorNode;
+                        errors.push(createDiagnosticForNodeInSourceFile(sourceFile, errorNode, ...diagnostics));
                         return undefined;
                     }
                 }
@@ -2352,6 +2404,9 @@ namespace ts {
             if (isNullOrUndefined(value)) return true; // All options are undefinable/nullable
             if (option.type === "list") {
                 return isArray(value);
+            }
+            if (isCommandLineOptionTypeStringOr(option)) {
+                return typeof value === "string" || typeof value === getCommandLineOptionTypeExcludingStringOr(option);
             }
             const expectedType = isString(option.type) ? option.type : "string";
             return typeof value === expectedType;
@@ -2455,15 +2510,18 @@ namespace ts {
     }
 
     function getCustomTypeMapOfCommandLineOption(optionDefinition: CommandLineOption): ESMap<string, string | number> | undefined {
-        if (optionDefinition.type === "string" || optionDefinition.type === "number" || optionDefinition.type === "boolean" || optionDefinition.type === "object") {
-            // this is of a type CommandLineOptionOfPrimitiveType
-            return undefined;
-        }
-        else if (optionDefinition.type === "list") {
-            return getCustomTypeMapOfCommandLineOption(optionDefinition.element);
-        }
-        else {
-            return optionDefinition.type;
+        switch (optionDefinition.type) {
+            case "string":
+            case "number":
+            case "boolean":
+            case "object":
+            case "string | object":
+                // this is of a type CommandLineOptionOfPrimitiveType
+                return undefined;
+            case "list":
+                return getCustomTypeMapOfCommandLineOption(optionDefinition.element);
+            default:
+                return optionDefinition.type;
         }
     }
 
@@ -3095,7 +3153,8 @@ namespace ts {
                         currentOption = (typingOptionstypeAcquisition || (typingOptionstypeAcquisition = getDefaultTypeAcquisition(configFileName)));
                         break;
                     default:
-                        Debug.fail("Unknown option");
+                        // Ignore anything other option that comes through as parent is not from root
+                        return;
                 }
 
                 currentOption[option.name] = normalizeOptionValue(option, basePath, value);
@@ -3300,11 +3359,10 @@ namespace ts {
     /*@internal*/
     export function convertJsonOption(opt: CommandLineOption, value: any, basePath: string, errors: Push<Diagnostic>): CompilerOptionsValue {
         if (isCompilerOptionsValue(opt, value)) {
-            const optType = opt.type;
-            if (optType === "list" && isArray(value)) {
+            if (opt.type === "list" && isArray(value)) {
                 return convertJsonOptionOfListType(opt , value, basePath, errors);
             }
-            else if (!isString(optType)) {
+            else if (!isString(opt.type)) {
                 return convertJsonOptionOfCustomType(opt as CommandLineOptionOfCustomType, value as string, errors);
             }
             const validatedValue = validateJsonOptionValue(opt, value, errors);
@@ -3344,7 +3402,7 @@ namespace ts {
         if (isNullOrUndefined(value)) return undefined;
         const d = opt.extraValidation?.(value);
         if (!d) return value;
-        errors.push(createCompilerDiagnostic(...d));
+        errors.push(createCompilerDiagnostic(...(isArray(d) ? d : d.diagnostics)));
         return undefined;
     }
 
@@ -3559,7 +3617,7 @@ namespace ts {
     function validateSpecs(specs: readonly string[], errors: Push<Diagnostic>, disallowTrailingRecursion: boolean, jsonSourceFile: TsConfigSourceFile | undefined, specKey: string): readonly string[] {
         return specs.filter(spec => {
             if (!isString(spec)) return false;
-            const diag = specToDiagnostic(spec, disallowTrailingRecursion);
+            const diag = specToDiagnostic(spec, /*_valueExpresion*/ undefined, disallowTrailingRecursion);
             if (diag !== undefined) {
                 errors.push(createDiagnostic(...diag));
             }
@@ -3574,7 +3632,7 @@ namespace ts {
         }
     }
 
-    function specToDiagnostic(spec: string, disallowTrailingRecursion?: boolean): [DiagnosticMessage, string] | undefined {
+    function specToDiagnostic(spec: string, _valueExpresion?: Expression, disallowTrailingRecursion?: boolean): [DiagnosticMessage, string] | undefined {
         if (disallowTrailingRecursion && invalidTrailingRecursionPattern.test(spec)) {
             return [Diagnostics.File_specification_cannot_end_in_a_recursive_directory_wildcard_Asterisk_Asterisk_Colon_0, spec];
         }
@@ -3736,6 +3794,7 @@ namespace ts {
     function getOptionValueWithEmptyStrings(value: any, option: CommandLineOption): {} {
         switch (option.type) {
             case "object": // "paths". Can't get any useful information from the value since we blank out strings, so just return "".
+            case "string | object":
                 return "";
             case "string": // Could be any arbitrary string -- use empty string instead.
                 return "";
@@ -3757,7 +3816,7 @@ namespace ts {
 
 
     function getDefaultValueForOption(option: CommandLineOption) {
-        switch (option.type) {
+        switch (getCommandLineOptionTypeExcludingStringOr(option)) {
             case "number":
                 return 1;
             case "boolean":
@@ -3770,9 +3829,21 @@ namespace ts {
             case "object":
                 return {};
             default:
-                const iterResult = option.type.keys().next();
+                const iterResult = (option as CommandLineOptionOfCustomType).type.keys().next();
                 if (!iterResult.done) return iterResult.value;
                 return Debug.fail("Expected 'option.type' to have entries.");
         }
+    }
+
+    /*@internal*/
+    export function getCommandLineOptionTypeExcludingStringOr(option: CommandLineOption) {
+        return isCommandLineOptionTypeStringOr(option) ?
+            (option.type as string).substring("string | ".length) :
+            option.type;
+    }
+
+    /*@internal*/
+    export function isCommandLineOptionTypeStringOr(option: CommandLineOption) {
+        return isString(option.type) && startsWith(option.type, "string | ");
     }
 }

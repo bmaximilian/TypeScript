@@ -1,4 +1,4 @@
---watchFactory somefactory/../malicious 0.ts
+--watchFactory {"name":"somefactory/../malicious"} 0.ts
 CompilerOptions::
 {}
 WatchOptions::

@@ -515,74 +515,89 @@ namespace ts.projectSystem {
             baselineTsserverLogs("watchEnvironment", "plugin overriding watch", session);
         });
 
-        it("watchFactory in config file", () => {
-            const { host, session, watchFile, watchDirectory, aTs, bTs, } = createHostForPlugins(/*opts*/ undefined, { watchFactory: "myplugin" });
-            host.require = (_initialPath, moduleName) => {
-                assert.equal(moduleName, "myplugin");
-                return {
-                    module: () => ({ watchFile, watchDirectory }),
-                    error: undefined
+        function verifyWatchFactoryInConfig(useObject: boolean) {
+            it(scenarioName("watchFactory in config file", useObject), () => {
+                const { host, session, watchFile, watchDirectory, aTs, bTs, } = createHostForPlugins(
+                    /*opts*/ undefined,
+                    { watchFactory: getWatchFactory("myplugin", useObject) }
+                );
+                host.require = (_initialPath, moduleName) => {
+                    assert.equal(moduleName, "myplugin");
+                    return {
+                        module: () => ({ watchFile, watchDirectory }),
+                        error: undefined
+                    };
                 };
-            };
-            openFilesForSession([aTs], session);
+                openFilesForSession([aTs], session);
 
-            // Change b.ts
-            session.logger.info("Change file");
-            host.writeFile(bTs.path, aTs.content);
-            // Because files are watched at project service level it will use host options
-            host.runQueuedTimeoutCallbacks();
+                // Change b.ts
+                session.logger.info("Change file");
+                host.writeFile(bTs.path, aTs.content);
+                // Because files are watched at project service level it will use host options
+                host.runQueuedTimeoutCallbacks();
 
-            baselineTsserverLogs("watchEnvironment", "watchFactory in config file", session);
-        });
+                baselineTsserverLogs("watchEnvironment", scenarioName("watchFactory in config file", useObject), session);
+            });
+        }
+        verifyWatchFactoryInConfig(/*useObject*/ false);
+        verifyWatchFactoryInConfig(/*useObject*/ true);
 
-        it("watchFactory as configuration of host", () => {
-            const { host, session, watchFile, watchDirectory, watchedFiles, aTs, bTs, } = createHostForPlugins();
-            host.require = (_initialPath, moduleName) => {
-                assert.equal(moduleName, "myplugin");
-                return {
-                    module: () => ({ watchFile, watchDirectory }),
-                    error: undefined
+        function verifyWatchFactoryConfigurationOfHost(useObject: boolean) {
+            it(scenarioName("watchFactory as configuration of host", useObject), () => {
+                const { host, session, watchFile, watchDirectory, watchedFiles, aTs, bTs, } = createHostForPlugins();
+                host.require = (_initialPath, moduleName) => {
+                    assert.equal(moduleName, "myplugin");
+                    return {
+                        module: () => ({ watchFile, watchDirectory }),
+                        error: undefined
+                    };
                 };
-            };
-            session.executeCommandSeq<protocol.ConfigureRequest>({
-                command: protocol.CommandTypes.Configure,
-                arguments: { watchOptions: { watchFactory: "myplugin" } }
+                session.executeCommandSeq<protocol.ConfigureRequest>({
+                    command: protocol.CommandTypes.Configure,
+                    arguments: { watchOptions: { watchFactory: getWatchFactory("myplugin", useObject) } }
+                });
+
+                openFilesForSession([aTs], session);
+
+                // Change b.ts
+                session.logger.info("Change file");
+                host.writeFile(bTs.path, aTs.content);
+                // Since we have overriden watch, this shouldnt do anything
+                host.checkTimeoutQueueLength(0);
+
+                // Actually invoke watches
+                session.logger.info("Invoke plugin watches");
+                watchedFiles.get(bTs.path)!.forEach(({ callback }) => callback(bTs.path, FileWatcherEventKind.Changed));
+                // Host should have updates queued
+                host.runQueuedTimeoutCallbacks();
+
+                baselineTsserverLogs("watchEnvironment", scenarioName("watchFactory as configuration of host", useObject), session);
             });
+        }
+        verifyWatchFactoryConfigurationOfHost(/*useObject*/ false);
+        verifyWatchFactoryConfigurationOfHost(/*useObject*/ true);
 
-            openFilesForSession([aTs], session);
+        function verifyWatchFactoryConfigurationOfHostError(useObject: boolean) {
+            it(scenarioName("watchFactory as configuration of host with errors", useObject), () => {
+                const { host, session, aTs, bTs, } = createHostForPlugins();
+                host.require = notImplemented; // Should throw if called
+                session.executeCommandSeq<protocol.ConfigureRequest>({
+                    command: protocol.CommandTypes.Configure,
+                    arguments: { watchOptions: { watchFactory: getWatchFactory("myplugin/../malicious", useObject) } }
+                });
 
-            // Change b.ts
-            session.logger.info("Change file");
-            host.writeFile(bTs.path, aTs.content);
-            // Since we have overriden watch, this shouldnt do anything
-            host.checkTimeoutQueueLength(0);
+                openFilesForSession([aTs], session);
 
-            // Actually invoke watches
-            session.logger.info("Invoke plugin watches");
-            watchedFiles.get(bTs.path)!.forEach(({ callback }) => callback(bTs.path, FileWatcherEventKind.Changed));
-            // Host should have updates queued
-            host.runQueuedTimeoutCallbacks();
+                // Change b.ts
+                session.logger.info("Change file");
+                host.writeFile(bTs.path, aTs.content);
+                host.runQueuedTimeoutCallbacks();
 
-            baselineTsserverLogs("watchEnvironment", "watchFactory as configuration of host", session);
-        });
-
-        it("watchFactory as configuration of host with errors", () => {
-            const { host, session, aTs, bTs, } = createHostForPlugins();
-            host.require = notImplemented; // Should throw if called
-            session.executeCommandSeq<protocol.ConfigureRequest>({
-                command: protocol.CommandTypes.Configure,
-                arguments: { watchOptions: { watchFactory: "myplugin/../malicious" } }
+                baselineTsserverLogs("watchEnvironment", scenarioName("watchFactory as configuration of host with errors", useObject), session);
             });
-
-            openFilesForSession([aTs], session);
-
-            // Change b.ts
-            session.logger.info("Change file");
-            host.writeFile(bTs.path, aTs.content);
-            host.runQueuedTimeoutCallbacks();
-
-            baselineTsserverLogs("watchEnvironment", "watchFactory as configuration of host with errors", session);
-        });
+        }
+        verifyWatchFactoryConfigurationOfHostError(/*useObject*/ false);
+        verifyWatchFactoryConfigurationOfHostError(/*useObject*/ true);
 
         function createHostForPlugins(opts?: Partial<TestSessionOptions>, watchOptions?: WatchOptions) {
             const configFile: File = {
@@ -636,6 +651,17 @@ namespace ts.projectSystem {
                 TestFSWithWatch.serializeMultiMap(session.logger.logs, "WatchedDirectories:Recursive", watchedDirectoriesRecursive);
                 TestFSWithWatch.serializeMultiMap(session.logger.logs, "WatchedDirectories", watchedDirectories);
             }
+        }
+        interface PluginImport extends ts.PluginImport {
+            myconfig: "somethingelse";
+        }
+        function getWatchFactory(watchFactory: string, useObject: boolean): PluginImport | string {
+            return useObject ?
+                { name: watchFactory, myconfig: "somethingelse" } :
+                watchFactory;
+        }
+        function scenarioName(scenario: string, useObject: boolean) {
+            return `${scenario}${useObject ? " object" : ""}`;
         }
     });
 }

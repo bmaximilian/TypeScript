@@ -278,6 +278,7 @@ namespace ts {
                     case "string":
                     case "number":
                     case "boolean":
+                    case "string | object":
                         return getDiagnosticText(Diagnostics.type_Colon);
                     case "list":
                         return getDiagnosticText(Diagnostics.one_or_more_Colon);
@@ -288,6 +289,7 @@ namespace ts {
 
             function getPossibleValues(option: CommandLineOption) {
                 let possibleValues: string;
+                if (isCommandLineOptionTypeStringOr(option)) return "string";
                 switch (option.type) {
                     case "string":
                     case "number":
@@ -305,7 +307,7 @@ namespace ts {
                         // ESMap<string, number | string>
                         // Group synonyms: es6/es2015
                         const inverted: { [value: string]: string[] } = {};
-                        option.type.forEach((value, name) => {
+                        (option as CommandLineOptionOfCustomType).type.forEach((value, name) => {
                             (inverted[value] ||= []).push(name);
                         });
                         return getEntries(inverted)

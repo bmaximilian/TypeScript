@@ -2990,7 +2990,7 @@ declare namespace ts {
         DynamicPriority = 2,
         FixedChunkSize = 3
     }
-    export type CompilerOptionsValue = string | number | boolean | (string | number)[] | string[] | MapLike<string[]> | PluginImport[] | ProjectReference[] | null | undefined;
+    export type CompilerOptionsValue = string | number | boolean | (string | number)[] | string[] | MapLike<string[]> | PluginImport | PluginImport[] | ProjectReference[] | null | undefined;
     export interface CompilerOptions {
         allowJs?: boolean;
         allowSyntheticDefaultImports?: boolean;
@@ -3097,8 +3097,8 @@ declare namespace ts {
         synchronousWatchDirectory?: boolean;
         excludeDirectories?: string[];
         excludeFiles?: string[];
-        watchFactory?: string;
-        [option: string]: CompilerOptionsValue | TsConfigSourceFile | undefined;
+        watchFactory?: string | PluginImport;
+        [option: string]: CompilerOptionsValue | PluginImport | TsConfigSourceFile | undefined;
     }
     export interface TypeAcquisition {
         /**
@@ -8290,7 +8290,7 @@ declare namespace ts.server.protocol {
         synchronousWatchDirectory?: boolean;
         excludeDirectories?: string[];
         excludeFiles?: string[];
-        watchFactory?: string;
+        watchFactory?: string | PluginImport;
         [option: string]: CompilerOptionsValue | undefined;
     }
     /**

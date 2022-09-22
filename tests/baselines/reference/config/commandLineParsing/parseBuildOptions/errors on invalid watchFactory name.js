@@ -1,4 +1,4 @@
---watchFactory somefactory/../malicious
+--watchFactory {"name":"somefactory/../malicious"}
 buildOptions::
 {}
 WatchOptions::

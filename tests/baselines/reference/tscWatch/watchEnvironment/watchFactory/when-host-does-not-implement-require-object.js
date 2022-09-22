@@ -6,7 +6,7 @@ export class a { prop = "hello"; foo() { return this.prop; } }
 export class b { prop = "hello"; foo() { return this.prop; } }
 
 //// [/user/username/projects/myproject/tsconfig.json]
-{"watchOptions":{"watchFactory":"myplugin/../malicious"}}
+{"watchOptions":{"watchFactory":{"name":"myplugin","myconfig":"somethingelse"}}}
 
 //// [/a/lib/lib.d.ts]
 /// <reference no-default-lib="true"/>
@@ -27,25 +27,21 @@ Output::
 [[90m12:00:23 AM[0m] Starting compilation in watch mode...
 
 Current directory: /user/username/projects/myproject CaseSensitiveFileNames: false
-FileWatcher:: Added:: WatchInfo: /user/username/projects/myproject/tsconfig.json 2000 {} Config file
+FileWatcher:: Added:: WatchInfo: /user/username/projects/myproject/tsconfig.json 2000 {"watchFactory":{"name":"myplugin","myconfig":"somethingelse"}} Config file
+Custom watchFactory is ignored because of not running in environment that supports 'require'. Watches will defualt to builtin.
 Synchronizing program
 CreatingProgramWith::
   roots: ["/user/username/projects/myproject/a.ts","/user/username/projects/myproject/b.ts"]
   options: {"watch":true,"extendedDiagnostics":true,"configFilePath":"/user/username/projects/myproject/tsconfig.json"}
-FileWatcher:: Added:: WatchInfo: /user/username/projects/myproject/a.ts 250 {} Source file
-FileWatcher:: Added:: WatchInfo: /user/username/projects/myproject/b.ts 250 {} Source file
-FileWatcher:: Added:: WatchInfo: /a/lib/lib.d.ts 250 {} Source file
-DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject/node_modules/@types 1 {} Type roots
-Elapsed:: *ms DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject/node_modules/@types 1 {} Type roots
-[96mtsconfig.json[0m:[93m1[0m:[93m33[0m - [91merror[0m[90m TS5096: [0m'watchFactory' name can only be package name.
+FileWatcher:: Added:: WatchInfo: /user/username/projects/myproject/a.ts 250 {"watchFactory":{"name":"myplugin","myconfig":"somethingelse"}} Source file
+FileWatcher:: Added:: WatchInfo: /user/username/projects/myproject/b.ts 250 {"watchFactory":{"name":"myplugin","myconfig":"somethingelse"}} Source file
+FileWatcher:: Added:: WatchInfo: /a/lib/lib.d.ts 250 {"watchFactory":{"name":"myplugin","myconfig":"somethingelse"}} Source file
+DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject/node_modules/@types 1 {"watchFactory":{"name":"myplugin","myconfig":"somethingelse"}} Type roots
+Elapsed:: *ms DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject/node_modules/@types 1 {"watchFactory":{"name":"myplugin","myconfig":"somethingelse"}} Type roots
+[[90m12:00:28 AM[0m] Found 0 errors. Watching for file changes.
 
-[7m1[0m {"watchOptions":{"watchFactory":"myplugin/../malicious"}}
-[7m [0m [91m                                ~~~~~~~~~~~~~~~~~~~~~~~[0m
-
-[[90m12:00:28 AM[0m] Found 1 error. Watching for file changes.
-
-DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject 1 {} Wild card directory
-Elapsed:: *ms DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject 1 {} Wild card directory
+DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject 1 {"watchFactory":{"name":"myplugin","myconfig":"somethingelse"}} Wild card directory
+Elapsed:: *ms DirectoryWatcher:: Added:: WatchInfo: /user/username/projects/myproject 1 {"watchFactory":{"name":"myplugin","myconfig":"somethingelse"}} Wild card directory
 
 
 Program root files: ["/user/username/projects/myproject/a.ts","/user/username/projects/myproject/b.ts"]
@@ -128,21 +124,16 @@ export class b { prop = "hello"; foo() { return this.prop; } }export function fo
 
 
 Output::
-FileWatcher:: Triggered with /user/username/projects/myproject/b.ts 1:: WatchInfo: /user/username/projects/myproject/b.ts 250 {} Source file
+FileWatcher:: Triggered with /user/username/projects/myproject/b.ts 1:: WatchInfo: /user/username/projects/myproject/b.ts 250 {"watchFactory":{"name":"myplugin","myconfig":"somethingelse"}} Source file
 Scheduling update
-Elapsed:: *ms FileWatcher:: Triggered with /user/username/projects/myproject/b.ts 1:: WatchInfo: /user/username/projects/myproject/b.ts 250 {} Source file
+Elapsed:: *ms FileWatcher:: Triggered with /user/username/projects/myproject/b.ts 1:: WatchInfo: /user/username/projects/myproject/b.ts 250 {"watchFactory":{"name":"myplugin","myconfig":"somethingelse"}} Source file
 Synchronizing program
 [[90m12:00:31 AM[0m] File change detected. Starting incremental compilation...
 
 CreatingProgramWith::
   roots: ["/user/username/projects/myproject/a.ts","/user/username/projects/myproject/b.ts"]
   options: {"watch":true,"extendedDiagnostics":true,"configFilePath":"/user/username/projects/myproject/tsconfig.json"}
-[96mtsconfig.json[0m:[93m1[0m:[93m33[0m - [91merror[0m[90m TS5096: [0m'watchFactory' name can only be package name.
-
-[7m1[0m {"watchOptions":{"watchFactory":"myplugin/../malicious"}}
-[7m [0m [91m                                ~~~~~~~~~~~~~~~~~~~~~~~[0m
-
-[[90m12:00:35 AM[0m] Found 1 error. Watching for file changes.
+[[90m12:00:35 AM[0m] Found 0 errors. Watching for file changes.
 
 
 

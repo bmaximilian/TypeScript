@@ -993,7 +993,8 @@ namespace ts {
                 reportErrorOnMissingRequire = false;
                 return createWatcher();
             }
-            if (parsePackageName(options.watchFactory).rest) {
+            const watchFactory = isString(options.watchFactory) ? options.watchFactory : options.watchFactory.name;
+            if (!watchFactory || parsePackageName(watchFactory).rest) {
                 return createWatcher();
             }
 
@@ -1005,26 +1006,36 @@ namespace ts {
                 combinePaths(system.getExecutingFilePath(), "../../..")
             ];
             const pathKey = searchPaths.join("\n") as PathKey;
-            const existingResolved = watchModules.get(options.watchFactory)?.get(pathKey);
+            const existingResolved = watchModules.get(watchFactory)?.get(pathKey);
             if (existingResolved !== undefined) return createWatcher(existingResolved || undefined);
 
             // Try the promise that was not resolved
-            const existingPromise = pendingModules?.get(options.watchFactory)?.get(pathKey);
+            const existingPromise = pendingModules?.get(watchFactory)?.get(pathKey);
             return existingPromise ?
                 createWatcherFromPromise(existingPromise, createWatcher) :
                 system.importPlugin ?
                     createWatcherFromPromise(
-                        importFactory(options.watchFactory, searchPaths, system, pathKey),
+                        importFactory(watchFactory, options, searchPaths, system, pathKey),
                         createWatcher
                     ) :
                     createWatcher(setImportPluginResult(
                         pathKey,
-                        resolveModule<UserWatchFactory>({ name: options.watchFactory }, searchPaths, getSystem(), sysLog)
+                        resolveModule<UserWatchFactory>(
+                            isString(options.watchFactory) ? { name: options.watchFactory } : options.watchFactory,
+                            searchPaths,
+                            getSystem(),
+                            sysLog
+                        )
                     ));
         }
 
-        function importFactory(watchFactory: string, searchPaths: string[], system: System, pathKey: PathKey) {
-            const result = importPlugin<UserWatchFactory>({ name: watchFactory }, searchPaths, system, sysLog).then(resolved => {
+        function importFactory(watchFactory: string, options: WatchOptions, searchPaths: string[], system: System, pathKey: PathKey) {
+            const result = importPlugin<UserWatchFactory>(
+                isString(options.watchFactory) ? { name: watchFactory } : options.watchFactory!,
+                searchPaths,
+                system,
+                sysLog
+            ).then(resolved => {
                 if (pendingModules) {
                     const perPath = pendingModules.get(watchFactory);
                     if (perPath?.delete(pathKey)) {

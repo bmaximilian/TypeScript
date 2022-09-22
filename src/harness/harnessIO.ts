@@ -369,8 +369,11 @@ namespace Harness {
                 // If not a primitive, the possible types are specified in what is effectively a map of options.
                 case "list":
                     return ts.parseListTypeOption(option, value, errors);
+                case "object":
+                case "string | object":
+                    return ts.parseObjectTypeOption(option, value, errors)?.value;
                 default:
-                    return ts.parseCustomTypeOption(option as ts.CommandLineOptionOfCustomType, value, errors);
+                    return ts.parseCustomTypeOption(option, value, errors);
             }
         }
 
